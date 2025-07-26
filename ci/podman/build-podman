@@ -1,0 +1,185 @@
+#!/bin/bash
+
+# SPDX-License-Identifier: MIT
+
+# Exit on error and on unbound variables
+set -eu
+
+# --- User ccnfiguration:
+
+# Private key for signing
+SIGN_PRIVATE_KEY="${HOME}/.ci/.podman/dirk1980.private"
+
+# File containing the keys password
+SIGN_PASSWORD_FILE="${HOME}/.ci/.podman/dirk1980.pw"
+
+# Registry authentication token
+AUTHFILE="$HOME/.ci/.podman/auth.json"
+
+# Registry username (Used to generate the image path)
+REG_USER="dirk1980"
+
+# Registry to use (Used to generate the image path)
+REG_ADDR="docker.io"
+
+# --- End of user configuration
+
+# Initialize script variables because we use 'set -u'
+PROJECT=""
+WORKDIR=""
+UPLOAD=""
+BUILD_ID=""
+MULTIARCH=""
+
+# Print a hopefully useful help text.
+help() {
+	cat << EOF
+Usage: $(basename "$0") [OPTIONS]
+
+This script builds a multi-architecture Podman image for a specified project
+and can optionally upload it, targeting either a 'stable' or 'nightly' release.
+
+Options:
+  -p <project>, --project=<project>
+      Sets the **project name**. This option is **mandatory**.
+
+  -w <directory>, --workdir=<directory>
+      Specifies the **working directory** where the build context is located.
+      This option is **mandatory**.
+
+  -b <id>, --build-id=<id>
+      Assigns a **build ID** to the image, which can be used for versioning or tracking.
+      This option is **mandatory**.
+
+  -u, --upload
+      If provided, the built image will be **uploaded** (pushed) to the configured server.
+      For 'stable' builds, the image will also be pushed as 'latest'.
+      This option is optional.
+
+  -m, --multiarch
+      Build multiarch image (amd64 and arm64)
+
+  -h, --help
+      Displays this help message and exits.
+
+Examples:
+  bootc-build -p myapp -w ./src -b 12345 -t nightly --upload
+  bootc-build --project=another-app --workdir=/opt/build/app --build-id=v1.2.0 --target=stable
+  bootc-build -p test-project -w /tmp/build -b abc-789 -t nightly -u
+
+EOF
+	exit 1
+}
+
+# Parse command line options
+if ! ARGS=$(getopt -o p:w:b:uhm --long project:,workdir:,build-id:,upload,help,multiarch -n "bootc-build" -- "$@"); then
+	echo "Error: Failed to parse options. Please check your command." >&2
+	help
+fi
+
+eval set -- "$ARGS"
+
+while true; do
+	case "$1" in
+		-p | --project)
+			PROJECT=$2
+			shift 2
+			;;
+		-w | --workdir)
+			WORKDIR=$2
+			shift 2
+			;;
+		-b | --build-id)
+			BUILD_ID=$2
+			shift 2
+			;;
+		-m | --multiarch)
+			MULTIARCH="true"
+			shift
+			;;
+		-u | --upload)
+			UPLOAD="true"
+			shift
+			;;
+		-h | --help)
+			help
+			;;
+		--) # End of options
+			shift
+			break
+			;;
+		*)
+			echo "Internal error in option parsing!" >&2
+			exit 1
+			;;
+	esac
+done
+
+# Show help if a mandatory option is missing
+if [ -z "$PROJECT" ] || [ -z "$BUILD_ID" ] || [ -z "$WORKDIR" ]; then
+	echo "Error: Mandatory options --project, --build-id or --workdir missing." >&2
+	help
+fi
+
+LOCKFILE="$HOME/.ci/build/locks/.${PROJECT}-running"
+
+# cleanup function
+cleanup() {
+	# Remove lock file
+	rm -f "${LOCKFILE}"
+	unset COSIGN_PASSWORD
+}
+
+# Trap for cleanup: Ensures lock file is removed even on script to error or signal.
+trap cleanup EXIT
+
+# Check if the desired build is already running
+if [ ! -f "${LOCKFILE}" ]; then
+	# Lock the build to avoid concurrent builds of the same type.
+	touch "${LOCKFILE}"
+
+	# Build multi arch manifest ih requested
+	if [[ ${MULTIARCH} == "true" ]]; then
+		buildah manifest exists "${REG_ADDR}/${REG_USER}/${PROJECT}:latest" &&
+			podman manifest rm "${REG_ADDR}/${REG_USER}/${PROJECT}:latest"
+
+		podman manifest create "${REG_ADDR}/${REG_USER}/${PROJECT}:latest"
+
+		podman build \
+			--rm \
+			--platform=linux/arm64,linux/amd64 \
+			--build-arg "buildid=${BUILD_ID}" \
+			--security-opt label=type:unconfined_t \
+			--pull=always \
+			--manifest "${REG_ADDR}/${REG_USER}/${PROJECT}:latest" \
+			"${WORKDIR}"
+
+		# Sign and Upload image to the registry if requested
+		if [ "$UPLOAD" == "true" ]; then
+			podman manifest push \
+				--authfile "${AUTHFILE}" \
+				--sign-by-sigstore-private-key "${SIGN_PRIVATE_KEY}" \
+				--sign-passphrase-file "${SIGN_PASSWORD_FILE}" \
+				"${REG_ADDR}/${REG_USER}/${PROJECT}:latest"
+		fi
+	else
+		# Build single arch image
+		podman build \
+			--rm \
+			--build-arg buildid="${BUILD_ID}" \
+			--security-opt label=type:unconfined_t \
+			--pull=always \
+			-t \
+			"${REG_ADDR}/${REG_USER}/${PROJECT}:latest" \
+			"${WORKDIR}"
+
+		# Sign and Upload image to the registry if requested
+		if [ "$UPLOAD" == "true" ]; then
+			podman push \
+				--authfile "${AUTHFILE}" \
+				--sign-by-sigstore-private-key "${SIGN_PRIVATE_KEY}" \
+				--sign-passphrase-file "${SIGN_PASSWORD_FILE}" \
+				"${REG_ADDR}/${REG_USER}/${PROJECT}:latest"
+		fi
+	fi
+fi

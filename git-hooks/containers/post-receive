@@ -1,0 +1,86 @@
+#!/bin/bash
+
+# SPDX-License-Identifier: MIT
+
+set -eu
+
+# --- User ccnfiguration:
+
+# Project name
+PROJECT=""
+
+# Set MULTIARCH to "true" tu build multiarch manifests
+MULTIARCH=""
+
+# The work tree, where the checkout/deploy should happen
+WORKDIR="$HOME/.ci/build/${PROJECT}"
+
+# The location of the .git directory
+GIT_DIR="$HOME/repos/${PROJECT}.git"
+
+# Set branch for CI
+BRANCH="master"
+
+# Script to run and lockoing to avoid concurrent runs
+SCRIPT="$HOME/.ci/podman/build-podman"
+
+# Lock file
+LOCK_BUILD="$HOME/.ci/build/locks/.${PROJECT}-running"
+
+# --- End of user configuration
+
+if [[ $PROJECT = "" ]]; then
+	echo "Missing project name in git hook!"
+	exit 1
+fi
+
+# Generate BUILD_ID
+BUILD_ID="$(date -u +%Y%m%d.%H%M)"
+
+# Set options for build script
+script_params=(
+	--project="${PROJECT}"
+	--workdir="${WORKDIR}"
+	--build-id="${BUILD_ID}"
+	-u
+)
+
+# Add multiarch option if this is a multi-arch project
+if  [[ ${MULTIARCH} == "true" ]]; then
+	script_params+=(--multiarch)
+fi
+
+while read -r oldrev newrev ref; do
+	# Check if script is available and executable
+	if [ -x "${SCRIPT}" ]; then
+		# Build image if refs/heads/master is received
+		if [ "$ref" = "refs/heads/${BRANCH}" ]; then
+			# Check that there is no 'build lock'
+			if [ ! -f "${LOCK_BUILD}" ]; then
+				# Report a started build
+				echo "Ref $ref received. Building image."
+
+				# Create workdir if it does not exist
+				if [ ! -d "${WORKDIR}" ]; then
+					mkdir -p "${WORKDIR}"
+				fi
+
+				# Clean it if it does
+				rm -rf "${WORKDIR:?}/*"
+
+				# Checkout git repository to workdir
+				git --work-tree="${WORKDIR}" --git-dir="${GIT_DIR}" \
+					checkout -f ${BRANCH}
+
+				# Start build script in a subshell
+				(setsid bash "${SCRIPT}" "${script_params[@]}" < /dev/null &> /dev/null &) &
+			else
+				# Report already running build if lock exists.
+				echo "Build is already running. Ignoring request."
+			fi
+		fi
+	else
+		# Report missing build script
+		echo "Builde script missing."
+	fi
+done
