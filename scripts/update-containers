@@ -8,6 +8,6 @@ set -eu
 IMAGES=()
 
 for img in "${IMAGES[@]}"; do
-	"${HOME}"/.ci/containers/container-build-priv -p "${img}" -w "${HOME}"/.ci/build/"${img}" \
+	"${HOME}"/.ci/podman/build-podman -p "${img}" -w "${HOME}"/.ci/build/"${img}" \
 		-b "$(date -u +%Y%m%d.%H%M)" -u
 done

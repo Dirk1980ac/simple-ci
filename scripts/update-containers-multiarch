@@ -10,6 +10,6 @@
 IMAGES=()
 
 for img in "${IMAGES[@]}"; do
-	"${HOME}"/.ci/containers/build-podman -p "${img}" -w "${HOME}"/.ci/build/"${img}" \
+	"${HOME}"/.ci/podman/build-podman -p "${img}" -w "${HOME}"/.ci/build/"${img}" \
 		-b "$(date -u +%Y%m%d.%H%M)" -u -m
 done
