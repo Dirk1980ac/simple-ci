@@ -1,18 +1,13 @@
 #!/bin/bash
-# SPDX-License-Identifier: MIT
 
 # Update bootc containers
-
-# I trigger this with a SystemD timer once a week to keep my images up to
-# date.
-
-# Set field Separator
-IFS=' '
+# SPDX-License-Identifier: MIT
+set -eu
 
 # Which images should be built?
-IMAGES=
+IMAGES=()
 
-for img in $IMAGES; do
-	"${HOME}"/.ci/containers/container-build-priv -p "${img}" -w "${HOME}"/ci-build/"${img}" \
+for img in "${IMAGES[@]}"; do
+	"${HOME}"/.ci/containers/container-build-priv -p "${img}" -w "${HOME}"/.ci/build/"${img}" \
 		-b "$(date -u +%Y%m%d.%H%M)" -u
 done

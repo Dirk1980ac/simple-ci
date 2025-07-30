@@ -6,13 +6,10 @@
 # I trigger this with a SystemD timer once a week to keep my images up to
 # date.
 
-# Set field Separator
-IFS=' '
-
 # Which images should be built?
-IMAGES=
+IMAGES=()
 
-for img in $IMAGES; do
-	"${HOME}"/.ci/containers/build-podman -p "${img}" -w "${HOME}"/ci-build/"${img}" \
+for img in "${IMAGES[@]}"; do
+	"${HOME}"/.ci/containers/build-podman -p "${img}" -w "${HOME}"/.ci/build/"${img}" \
 		-b "$(date -u +%Y%m%d.%H%M)" -u -m
 done
