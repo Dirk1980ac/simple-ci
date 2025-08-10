@@ -7,20 +7,11 @@ set -eu
 
 # --- User ccnfiguration:
 
-# Private key for signing
-SIGN_PRIVATE_KEY="${HOME}/.ci/.podman/dirk1980.private"
-
-# File containing the keys password
-SIGN_PASSWORD_FILE="${HOME}/.ci/.podman/dirk1980.pw"
-
-# Registry authentication token
-AUTHFILE="$HOME/.ci/.podman/auth.json"
-
-# Registry username (Used to generate the image path)
-REG_USER="dirk1980"
-
-# Registry to use (Used to generate the image path)
-REG_ADDR="docker.io"
+SIGN_PRIVATE_KEY="${HOME}/.ci/.podman/dirk1980.private" # Private key for signing
+SIGN_PASSWORD_FILE="${HOME}/.ci/.podman/dirk1980.pw" # Key password file
+AUTHFILE="$HOME/.ci/.podman/auth.json" # Registry authentication token
+REG_USER="dirk1980" # Registry username (Used to generate the image path)
+REG_ADDR="docker.io" # Registry to use (Used to generate the image path)
 
 # --- End of user configuration
 

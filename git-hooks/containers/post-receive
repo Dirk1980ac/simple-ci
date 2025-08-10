@@ -4,30 +4,17 @@
 
 set -eu
 
-# --- User ccnfiguration:
+# --- User ccnfiguration: ---
 
-# Project name
-PROJECT=""
+PROJECT="" # Project name
+MULTIARCH="false" # Build multiarch manifests
+WORKDIR="$HOME/.ci/build/${PROJECT}" # Work tree
+GIT_DIR="$HOME/repos/${PROJECT}.git" # .git directory
+BRANCH="master" # Branch for CI
+SCRIPT="$HOME/.ci/podman/build-podman" # Build script
+LOCK_BUILD="$HOME/.ci/build/locks/.${PROJECT}-running"	# Lock file
 
-# Set MULTIARCH to "true" tu build multiarch manifests
-MULTIARCH=""
-
-# The work tree, where the checkout/deploy should happen
-WORKDIR="$HOME/.ci/build/${PROJECT}"
-
-# The location of the .git directory
-GIT_DIR="$HOME/repos/${PROJECT}.git"
-
-# Set branch for CI
-BRANCH="master"
-
-# Script to run and lockoing to avoid concurrent runs
-SCRIPT="$HOME/.ci/podman/build-podman"
-
-# Lock file
-LOCK_BUILD="$HOME/.ci/build/locks/.${PROJECT}-running"
-
-# --- End of user configuration
+# --- End user configuration ---
 
 if [[ $PROJECT = "" ]]; then
 	echo "Missing project name in git hook!"
