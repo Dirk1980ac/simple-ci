@@ -2,7 +2,7 @@
 Description=Auto-update podman images
 
 [Timer]
-OnCalendar=Sat *-*-* 08:00:00
+OnCalendar=Sat *-*-* 06:00:00
 Persistent=true
 
 [Install]

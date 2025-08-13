@@ -1,0 +1,15 @@
+#!/bin/bash
+# SPDX-License-Identifier: MIT
+
+# Update bootc containers
+
+# I trigger this with a SystemD timer once a week to keep my images up to
+# date.
+
+# Which images should be built?
+IMAGES=()
+
+for img in "${IMAGES[@]}"; do
+	"${HOME}"/.ci/podman/build-podman -p "${img}" -w "${HOME}"/.ci/build/"${img}" \
+		-b "$(date -u +%Y%m%d.%H%M)" -u -m
+done

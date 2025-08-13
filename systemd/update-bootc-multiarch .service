@@ -3,6 +3,6 @@ Description=Update podman multiarch images
 
 [Service]
 Type=oneshot
-PIDFile=/run/user/%U/update-containers-multiarch.pid
-ExecStart=%h/bin/update-containers
+PIDFile=/run/user/%U/update-bootc-multiarch.pid
+ExecStart=%h/bin/update-bootc-multiarch
 RemainAfterExit=yes
