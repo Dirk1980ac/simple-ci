@@ -46,7 +46,7 @@ Options:
   --bootc
       Thjis is a BootC image. This skips building of RISC-V images because there
 	  is no BootC base image right now.
-	  
+
   -u, --upload
       If provided, the built image will be **uploaded** (pushed) to the configured server.
       For 'stable' builds, the image will also be pushed as 'latest'.
@@ -167,7 +167,7 @@ if [ ! -f "${LOCKFILE}" ]; then
 		if [ $BOOTC == "false" ]; then
 			podman build \
 				--rm \
-				--from=docker.io/dirk1980/fedora-riscv:latest \
+				--from=docker.io/dirk1980/fedora-riscv64:latest \
 				--platform=linux/riscv64 \
 				--build-arg "buildid=${BUILD_ID}" \
 				--security-opt label=type:unconfined_t \
