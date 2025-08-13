@@ -18,9 +18,10 @@ REG_ADDR="docker.io" # Registry to use (Used to generate the image path)
 # Initialize script variables because we use 'set -u'
 PROJECT=""
 WORKDIR=""
-UPLOAD=""
-BUILD_ID=""
-MULTIARCH=""
+UPLOAD="false"
+BUILD_ID="missing"
+MULTIARCH="false"
+BOOTC="false"
 
 # Print a hopefully useful help text.
 help() {
@@ -42,6 +43,10 @@ Options:
       Assigns a **build ID** to the image, which can be used for versioning or tracking.
       This option is **mandatory**.
 
+  --bootc
+      Thjis is a BootC image. This skips building of RISC-V images because there
+	  is no BootC base image right now.
+	  
   -u, --upload
       If provided, the built image will be **uploaded** (pushed) to the configured server.
       For 'stable' builds, the image will also be pushed as 'latest'.
@@ -63,7 +68,7 @@ EOF
 }
 
 # Parse command line options
-if ! ARGS=$(getopt -o p:w:b:uhm --long project:,workdir:,build-id:,upload,help,multiarch -n "bootc-build" -- "$@"); then
+if ! ARGS=$(getopt -o p:w:b:uhm --long project:,workdir:,build-id:,upload,help,multiarch,bootc -n "bootc-build" -- "$@"); then
 	echo "Error: Failed to parse options. Please check your command." >&2
 	help
 fi
@@ -86,6 +91,10 @@ while true; do
 			;;
 		-m | --multiarch)
 			MULTIARCH="true"
+			shift
+			;;
+		--bootc)
+			BOOTC="true"
 			shift
 			;;
 		-u | --upload)
@@ -133,17 +142,55 @@ if [ ! -f "${LOCKFILE}" ]; then
 	if [[ ${MULTIARCH} == "true" ]]; then
 		buildah manifest exists "${REG_ADDR}/${REG_USER}/${PROJECT}:latest" &&
 			podman manifest rm "${REG_ADDR}/${REG_USER}/${PROJECT}:latest"
-
 		podman manifest create "${REG_ADDR}/${REG_USER}/${PROJECT}:latest"
 
 		podman build \
 			--rm \
-			--platform=linux/arm64,linux/amd64 \
+			--platform=linux/amd64 \
 			--build-arg "buildid=${BUILD_ID}" \
 			--security-opt label=type:unconfined_t \
 			--pull=always \
 			--network host \
-			--manifest "${REG_ADDR}/${REG_USER}/${PROJECT}:latest" "${WORKDIR}"
+			-t "${REG_ADDR}/${REG_USER}/${PROJECT}:x86_64" "${WORKDIR}"
+
+		podman build \
+			--rm \
+			--platform=linux/arm64 \
+			--build-arg "buildid=${BUILD_ID}" \
+			--security-opt label=type:unconfined_t \
+			--pull=always \
+			--network host \
+			-t "${REG_ADDR}/${REG_USER}/${PROJECT}:aarch64" "${WORKDIR}"
+
+		# Only build RISCV64 images if we are not building a bootc container
+		# until a BootC base image is available
+		if [ $BOOTC == "false" ]; then
+			podman build \
+				--rm \
+				--from=docker.io/dirk1980/fedora-riscv:latest \
+				--platform=linux/riscv64 \
+				--build-arg "buildid=${BUILD_ID}" \
+				--security-opt label=type:unconfined_t \
+				--pull=always \
+				--network host \
+				-t "${REG_ADDR}/${REG_USER}/${PROJECT}:riscv64" "${WORKDIR}"
+
+			podman manifest add "${REG_ADDR}/${REG_USER}/${PROJECT}:latest" \
+				"${REG_ADDR}/${REG_USER}/${PROJECT}:riscv64"
+		fi
+
+		podman manifest add "${REG_ADDR}/${REG_USER}/${PROJECT}:latest" \
+			"${REG_ADDR}/${REG_USER}/${PROJECT}:aarch64"
+		podman manifest add "${REG_ADDR}/${REG_USER}/${PROJECT}:latest" \
+			"${REG_ADDR}/${REG_USER}/${PROJECT}:x86_64"
+
+		# Remove trmporary tags.
+		podman image untag "${REG_ADDR}/${REG_USER}/${PROJECT}:aarch64"
+		podman image untag "${REG_ADDR}/${REG_USER}/${PROJECT}:x86_64"
+
+		if [ $BOOTC == "false" ]; then
+			podman image untag "${REG_ADDR}/${REG_USER}/${PROJECT}:riscv64"
+		fi
 
 		# Sign and Upload image to the registry if requested
 		if [ "$UPLOAD" == "true" ]; then

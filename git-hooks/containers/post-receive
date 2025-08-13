@@ -8,11 +8,12 @@ set -eu
 
 PROJECT="" # Project name
 MULTIARCH="false" # Build multiarch manifests
+BOOTC="false"
 WORKDIR="$HOME/.ci/build/${PROJECT}" # Work tree
 GIT_DIR="$HOME/repos/${PROJECT}.git" # .git directory
 BRANCH="master" # Branch for CI
 SCRIPT="$HOME/.ci/podman/build-podman" # Build script
-LOCK_BUILD="$HOME/.ci/build/locks/.${PROJECT}-running"	# Lock file
+LOCK_BUILD="$HOME/.ci/build/locks/.${PROJECT}-running" # Lock file
 
 # --- End user configuration ---
 
@@ -35,6 +36,10 @@ script_params=(
 # Add multiarch option if this is a multi-arch project
 if  [[ ${MULTIARCH} == "true" ]]; then
 	script_params+=(--multiarch)
+fi
+
+if  [[ ${BOOTC} == "true" ]]; then
+	script_params+=(--bootc)
 fi
 
 while read -r oldrev newrev ref; do
