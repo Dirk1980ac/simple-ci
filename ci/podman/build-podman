@@ -64,7 +64,7 @@ EOF
 }
 
 # Parse command line options
-if ! ARGS=$(getopt -o p:w:b:uh --long project:,workdir:,build-id:,upload,help,arch -n "build-podman" -- "$@"); then
+if ! ARGS=$(getopt -o p:w:b:uha: --long project:,workdir:,build-id:,upload,help,arch: -n "build-podman" -- "$@"); then
 	echo "Error: Failed to parse options. Please check your command." >&2
 	help
 fi
@@ -85,7 +85,7 @@ while true; do
 			BUILD_ID=$2
 			shift 2
 			;;
-		--arch)
+		-a | --arch)
 			ARCHES+=(--arch "$2")
 			shift 2
 			;;
@@ -119,7 +119,6 @@ LOCKFILE="$HOME/.ci/build/locks/.${PROJECT}-running"
 cleanup() {
 	# Remove lock file
 	rm -f "${LOCKFILE}"
-	unset COSIGN_PASSWORD
 }
 
 # Trap for cleanup: Ensures lock file is removed even on script to error or signal.
@@ -147,7 +146,7 @@ if [ ! -f "${LOCKFILE}" ]; then
 				podman build \
 					"${param[@]}" \
 					--rm \
-					--arch="$arch" \
+					"$arch" \
 					--build-arg "buildid=${BUILD_ID}" \
 					--security-opt label=type:unconfined_t \
 					--pull=always \
@@ -155,7 +154,7 @@ if [ ! -f "${LOCKFILE}" ]; then
 					-t "${REG_ADDR}/${REG_USER}/${PROJECT}:$arch" "${WORKDIR}"
 
 				podman manifest add "${REG_ADDR}/${REG_USER}/${PROJECT}:latest" \
-					"${REG_ADDR}/${REG_USER}/${PROJECT}:riscv64"
+					"${REG_ADDR}/${REG_USER}/${PROJECT}:$arch"
 			done
 		fi
 
@@ -172,7 +171,7 @@ if [ ! -f "${LOCKFILE}" ]; then
 				--sign-passphrase-file "${SIGN_PASSWORD_FILE}" \
 				"${REG_ADDR}/${REG_USER}/${PROJECT}:latest"
 		fi
-	elif [ ${#ARCHES[@]} -lt 2 ]; then
+	elif [ ${#ARCHES[@]} -eq 1 ]; then
 		if [ -n "${ARCHES[0]}" ]; then
 			param=("--arch ${ARCHES[0]}")
 		fi
