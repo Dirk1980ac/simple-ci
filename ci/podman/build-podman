@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/env bash
 
 # SPDX-License-Identifier: MIT
 
@@ -20,8 +20,8 @@ PROJECT=""
 WORKDIR=""
 UPLOAD="false"
 BUILD_ID="missing"
-MULTIARCH="false"
-BOOTC="false"
+ARCHES=()
+param=()
 
 # Print a hopefully useful help text.
 help() {
@@ -43,17 +43,13 @@ Options:
       Assigns a **build ID** to the image, which can be used for versioning or tracking.
       This option is **mandatory**.
 
-  --bootc
-      Thjis is a BootC image. This skips building of RISC-V images because there
-	  is no BootC base image right now.
+  --arch
+      Arch to build. Can be used multiple times to build multiple images.
 
   -u, --upload
       If provided, the built image will be **uploaded** (pushed) to the configured server.
       For 'stable' builds, the image will also be pushed as 'latest'.
       This option is optional.
-
-  -m, --multiarch
-      Build multiarch image (amd64 and arm64)
 
   -h, --help
       Displays this help message and exits.
@@ -68,7 +64,7 @@ EOF
 }
 
 # Parse command line options
-if ! ARGS=$(getopt -o p:w:b:uhm --long project:,workdir:,build-id:,upload,help,multiarch,bootc -n "bootc-build" -- "$@"); then
+if ! ARGS=$(getopt -o p:w:b:uh --long project:,workdir:,build-id:,upload,help,arch -n "build-podman" -- "$@"); then
 	echo "Error: Failed to parse options. Please check your command." >&2
 	help
 fi
@@ -89,13 +85,9 @@ while true; do
 			BUILD_ID=$2
 			shift 2
 			;;
-		-m | --multiarch)
-			MULTIARCH="true"
-			shift
-			;;
-		--bootc)
-			BOOTC="true"
-			shift
+		--arch)
+			ARCHES+=(--arch "$2")
+			shift 2
 			;;
 		-u | --upload)
 			UPLOAD="true"
@@ -139,58 +131,38 @@ if [ ! -f "${LOCKFILE}" ]; then
 	touch "${LOCKFILE}"
 
 	# Build multi arch manifest ih requested
-	if [[ ${MULTIARCH} == "true" ]]; then
-		buildah manifest exists "${REG_ADDR}/${REG_USER}/${PROJECT}:latest" &&
+	if [ ${#ARCHES[@]} -gt 1 ]; then
+		podman manifest exists "${REG_ADDR}/${REG_USER}/${PROJECT}:latest" &&
 			podman manifest rm "${REG_ADDR}/${REG_USER}/${PROJECT}:latest"
 		podman manifest create "${REG_ADDR}/${REG_USER}/${PROJECT}:latest"
 
-		podman build \
-			--rm \
-			--platform=linux/amd64 \
-			--build-arg "buildid=${BUILD_ID}" \
-			--security-opt label=type:unconfined_t \
-			--pull=always \
-			--network host \
-			-t "${REG_ADDR}/${REG_USER}/${PROJECT}:x86_64" "${WORKDIR}"
+		if [ ${#ARCHES[@]} -gt 1 ]; then
+			for arch in "${ARCHES[@]}"; do
 
-		podman build \
-			--rm \
-			--platform=linux/arm64 \
-			--build-arg "buildid=${BUILD_ID}" \
-			--security-opt label=type:unconfined_t \
-			--pull=always \
-			--network host \
-			-t "${REG_ADDR}/${REG_USER}/${PROJECT}:aarch64" "${WORKDIR}"
+				# Use our own base image if we are building a ricv64 image
+				if [ "$arch" == "riscv64" ]; then
+					param=("--from=docker.io/dirk1980/fedora-riscv64:latest")
+				fi
 
-		# Only build RISCV64 images if we are not building a bootc container
-		# until a BootC base image is available
-		if [ $BOOTC == "false" ]; then
-			podman build \
-				--rm \
-				--from=docker.io/dirk1980/fedora-riscv64:latest \
-				--platform=linux/riscv64 \
-				--build-arg "buildid=${BUILD_ID}" \
-				--security-opt label=type:unconfined_t \
-				--pull=always \
-				--network host \
-				-t "${REG_ADDR}/${REG_USER}/${PROJECT}:riscv64" "${WORKDIR}"
+				podman build \
+					"${param[@]}" \
+					--rm \
+					--arch="$arch" \
+					--build-arg "buildid=${BUILD_ID}" \
+					--security-opt label=type:unconfined_t \
+					--pull=always \
+					--network host \
+					-t "${REG_ADDR}/${REG_USER}/${PROJECT}:$arch" "${WORKDIR}"
 
-			podman manifest add "${REG_ADDR}/${REG_USER}/${PROJECT}:latest" \
-				"${REG_ADDR}/${REG_USER}/${PROJECT}:riscv64"
+				podman manifest add "${REG_ADDR}/${REG_USER}/${PROJECT}:latest" \
+					"${REG_ADDR}/${REG_USER}/${PROJECT}:riscv64"
+			done
 		fi
 
-		podman manifest add "${REG_ADDR}/${REG_USER}/${PROJECT}:latest" \
-			"${REG_ADDR}/${REG_USER}/${PROJECT}:aarch64"
-		podman manifest add "${REG_ADDR}/${REG_USER}/${PROJECT}:latest" \
-			"${REG_ADDR}/${REG_USER}/${PROJECT}:x86_64"
-
-		# Remove trmporary tags.
-		podman image untag "${REG_ADDR}/${REG_USER}/${PROJECT}:aarch64"
-		podman image untag "${REG_ADDR}/${REG_USER}/${PROJECT}:x86_64"
-
-		if [ $BOOTC == "false" ]; then
-			podman image untag "${REG_ADDR}/${REG_USER}/${PROJECT}:riscv64"
-		fi
+		for arch in "${ARCHES[@]}"; do
+			# Remove trmporary tags.
+			podman image untag "${REG_ADDR}/${REG_USER}/${PROJECT}:$arch"
+		done
 
 		# Sign and Upload image to the registry if requested
 		if [ "$UPLOAD" == "true" ]; then
@@ -200,9 +172,18 @@ if [ ! -f "${LOCKFILE}" ]; then
 				--sign-passphrase-file "${SIGN_PASSWORD_FILE}" \
 				"${REG_ADDR}/${REG_USER}/${PROJECT}:latest"
 		fi
-	else
+	elif [ ${#ARCHES[@]} -lt 2 ]; then
+		if [ -n "${ARCHES[0]}" ]; then
+			param=("--arch ${ARCHES[0]}")
+		fi
+
+		if [ "$arch" == "riscv64" ]; then
+			param+=("--from=docker.io/dirk1980/fedora-riscv64:latest")
+		fi
+
 		# Build single arch image
 		podman build \
+			"${param[@]}" \
 			--rm \
 			--build-arg buildid="${BUILD_ID}" \
 			--security-opt label=type:unconfined_t \

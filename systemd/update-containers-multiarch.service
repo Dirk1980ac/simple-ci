@@ -1,8 +1,0 @@
-[Unit]
-Description=Update podman multiarch images
-
-[Service]
-Type=oneshot
-PIDFile=/run/user/%U/update-containers-multiarch.pid
-ExecStart=%h/bin/update-containers
-RemainAfterExit=yes

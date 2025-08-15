@@ -1,13 +1,28 @@
-#!/bin/bash
+#!/bin/env bash
 
 # Update bootc containers
 # SPDX-License-Identifier: MIT
 set -eu
 
 # Which images should be built?
-IMAGES=()
+SINGLE_IMAGES=()
+MULTI_IMAGES=()
+BOOTC_IMAGES=()
+SINGLEARCH="--arch amd64"
+MULTIARCH="--arch amd64 --arch arm64 --arch riscv64"
+BOOTC_ARCH="--arch amd64 --arch arm64"
 
-for img in "${IMAGES[@]}"; do
+for img in "${SINGLE_IMAGES[@]}"; do
 	"${HOME}"/.ci/podman/build-podman -p "${img}" -w "${HOME}"/.ci/build/"${img}" \
-		-b "$(date -u +%Y%m%d.%H%M)" -u
+		-b "$(date -u +%Y%m%d.%H%M)" -u "$SINGLEARCH"
+done
+
+for img in "${MULTI_IMAGES[@]}"; do
+	"${HOME}"/.ci/podman/build-podman -p "${img}" -w "${HOME}"/.ci/build/"${img}" \
+		-b "$(date -u +%Y%m%d.%H%M)" -u "$MULTIARCH"
+done
+
+for img in "${BOOTC_IMAGES[@]}"; do
+	"${HOME}"/.ci/podman/build-podman -p "${img}" -w "${HOME}"/.ci/build/"${img}" \
+		-b "$(date -u +%Y%m%d.%H%M)" -u "$BOOTC_ARCH"
 done

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/env bash
 
 # SPDX-License-Identifier: MIT
 
@@ -7,8 +7,7 @@ set -eu
 # --- User ccnfiguration: ---
 
 PROJECT="" # Project name
-MULTIARCH="false" # Build multiarch manifests
-BOOTC="false"
+ARCHES=() # Arches ro build ("arch1" "arch2" ...)
 WORKDIR="$HOME/.ci/build/${PROJECT}" # Work tree
 GIT_DIR="$HOME/repos/${PROJECT}.git" # .git directory
 BRANCH="master" # Branch for CI
@@ -33,13 +32,10 @@ script_params=(
 	-u
 )
 
-# Add multiarch option if this is a multi-arch project
-if  [[ ${MULTIARCH} == "true" ]]; then
-	script_params+=(--multiarch)
-fi
-
-if  [[ ${BOOTC} == "true" ]]; then
-	script_params+=(--bootc)
+if [ ${#ARCHES[@]} -gt 0 ]; then
+	for arch in "${ARCHES[@]}"; do
+		script_params=(--arch "$arch")
+	done
 fi
 
 while read -r oldrev newrev ref; do
@@ -73,6 +69,6 @@ while read -r oldrev newrev ref; do
 		fi
 	else
 		# Report missing build script
-		echo "Builde script missing."
+		echo "Builder script missing."
 	fi
 done
