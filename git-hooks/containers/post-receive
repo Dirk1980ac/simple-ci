@@ -34,10 +34,11 @@ script_params=(
 
 if [ ${#ARCHES[@]} -gt 0 ]; then
 	for arch in "${ARCHES[@]}"; do
-		script_params=(--arch "$arch")
+		script_params+=(--arch "$arch")
 	done
 fi
 
+# shellcheck disable=SC2034
 while read -r oldrev newrev ref; do
 	# Check if script is available and executable
 	if [ -x "${SCRIPT}" ]; then

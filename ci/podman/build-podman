@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MIT
 
 # Exit on error and on unbound variables
-set -eu
+set -eux
 
 # --- User ccnfiguration:
 
@@ -21,7 +21,7 @@ WORKDIR=""
 UPLOAD="false"
 BUILD_ID="missing"
 ARCHES=()
-param=()
+param=""
 
 # Print a hopefully useful help text.
 help() {
@@ -86,7 +86,7 @@ while true; do
 			shift 2
 			;;
 		-a | --arch)
-			ARCHES+=(--arch "$2")
+			ARCHES+=("$2")
 			shift 2
 			;;
 		-u | --upload)
@@ -140,13 +140,13 @@ if [ ! -f "${LOCKFILE}" ]; then
 
 				# Use our own base image if we are building a ricv64 image
 				if [ "$arch" == "riscv64" ]; then
-					param=("--from=docker.io/dirk1980/fedora-riscv64:latest")
+					param="--from docker.io/dirk1980/fedora-riscv64:latest"
 				fi
-
+				# shellcheck disable=SC2086
 				podman build \
-					"${param[@]}" \
+					$param \
 					--rm \
-					"$arch" \
+					--arch "$arch" \
 					--build-arg "buildid=${BUILD_ID}" \
 					--security-opt label=type:unconfined_t \
 					--pull=always \
@@ -172,17 +172,15 @@ if [ ! -f "${LOCKFILE}" ]; then
 				"${REG_ADDR}/${REG_USER}/${PROJECT}:latest"
 		fi
 	elif [ ${#ARCHES[@]} -eq 1 ]; then
-		if [ -n "${ARCHES[0]}" ]; then
-			param=("--arch ${ARCHES[0]}")
+		if [ "${ARCHES[0]}" == "riscv64" ]; then
+			param="--from docker.io/dirk1980/fedora-riscv64:latest"
 		fi
 
-		if [ "$arch" == "riscv64" ]; then
-			param+=("--from=docker.io/dirk1980/fedora-riscv64:latest")
-		fi
-
+		# shellcheck disable=SC2086
 		# Build single arch image
 		podman build \
-			"${param[@]}" \
+			$param \
+			--arch "${ARCHES[0]}" \
 			--rm \
 			--build-arg buildid="${BUILD_ID}" \
 			--security-opt label=type:unconfined_t \
