@@ -15,6 +15,9 @@ REG_ADDR="docker.io" # Registry to use (Used to generate the image path)
 SIGN_PRIVATE_KEY="${HOME}/.ci/.podman/$REG_USER.private" # Private key for signing
 SIGN_PASSWORD_FILE="${HOME}/.ci/.podman/$REG_USER.pw" # Key password file
 
+# Encryption key
+ENCRYPT_KEY="jwe:${HOME}/.ci/.podman/$REG_USER-encrypt.pub" # Private key for signing
+
 # Podman authfile
 AUTHFILE="$HOME/.ci/.podman/auth.json" # Registry authentication token
 
@@ -26,7 +29,8 @@ WORKDIR=""
 UPLOAD="false"
 BUILD_ID="missing"
 ARCHES=()
-param=""
+param=()
+ENCRYPT="false"
 
 # Print a hopefully useful help text.
 help() {
@@ -51,6 +55,9 @@ Options:
   --arch
       Arch to build. Can be used multiple times to build multiple images.
 
+  --encrypt
+      Encrypt the image before push.
+
   -u, --upload
       If provided, the built image will be **uploaded** (pushed) to the configured server.
       For 'stable' builds, the image will also be pushed as 'latest'.
@@ -69,7 +76,7 @@ EOF
 }
 
 # Parse command line options
-if ! ARGS=$(getopt -o p:w:b:uha: --long project:,workdir:,build-id:,upload,help,arch: -n "build-podman" -- "$@"); then
+if ! ARGS=$(getopt -o p:w:b:uha: --long project:,workdir:,build-id:,upload,help,arch:,encrypt -n "build-podman" -- "$@"); then
 	echo "Error: Failed to parse options. Please check your command." >&2
 	help
 fi
@@ -100,6 +107,9 @@ while true; do
 			;;
 		-h | --help)
 			help
+			;;
+		--encrypt)
+			ENCRYPT="true"
 			;;
 		--) # End of options
 			shift
@@ -145,11 +155,17 @@ if [ ! -f "${LOCKFILE}" ]; then
 
 				# Use our own base image if we are building a ricv64 image
 				if [ "$arch" == "riscv64" ]; then
-					param="--from docker.io/dirk1980/fedora-riscv64:latest"
+					param+=(--from docker.io/dirk1980/fedora-riscv64:latest)
 				fi
+
+				# Encrypt image if enabled
+				if [ "$ENCRYPT" == true ]; then
+					param+=(--encryption-key="$ENCRYPT_KEY")
+				fi
+
 				# shellcheck disable=SC2086
 				podman build \
-					$param \
+					"${param[@]}" \
 					--rm \
 					--arch "$arch" \
 					--build-arg "buildid=${BUILD_ID}" \
@@ -177,14 +193,20 @@ if [ ! -f "${LOCKFILE}" ]; then
 				"${REG_ADDR}/${REG_USER}/${PROJECT}:latest"
 		fi
 	elif [ ${#ARCHES[@]} -eq 1 ]; then
-		if [ "${ARCHES[0]}" == "riscv64" ]; then
-			param="--from docker.io/dirk1980/fedora-riscv64:latest"
+		# Use our own base image if we are building a ricv64 image
+		if [ "$arch" == "riscv64" ]; then
+			param+=(--from docker.io/dirk1980/fedora-riscv64:latest)
+		fi
+
+		# Encrypt image if enabled
+		if [ "$ENCRYPT" == true ]; then
+			param+=(--encryption-key="$ENCRYPT_KEY")
 		fi
 
 		# shellcheck disable=SC2086
 		# Build single arch image
 		podman build \
-			$param \
+			"${param[@]}" \
 			--arch "${ARCHES[0]}" \
 			--rm \
 			--build-arg buildid="${BUILD_ID}" \

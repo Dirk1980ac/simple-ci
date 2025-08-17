@@ -7,8 +7,9 @@ set -eu
 # --- User ccnfiguration: ---
 
 PROJECT="" # Project name
-ARCHES=() # Arches ro build ("arch1" "arch2" ...)
-WORKDIR="$HOME/.ci/build/${PROJECT}" # Work tree
+ARCHES=() # Architectures to build ("arch1" "arch2" ...)
+ENCRYPT="false" # Encrypt the image before pushing it to the server
+WORKDIR="$HOME/.ci/build/${PROJECT}" # Working directory
 GIT_DIR="$HOME/repos/${PROJECT}.git" # .git directory
 BRANCH="master" # Branch for CI
 SCRIPT="$HOME/.ci/podman/build-podman" # Build script
@@ -29,13 +30,17 @@ script_params=(
 	--project="${PROJECT}"
 	--workdir="${WORKDIR}"
 	--build-id="${BUILD_ID}"
-	-u
+	--upload
 )
 
 if [ ${#ARCHES[@]} -gt 0 ]; then
 	for arch in "${ARCHES[@]}"; do
 		script_params+=(--arch "$arch")
 	done
+fi
+
+if [ "$ENCRYPT" == "true" ]; then
+	script_params+=(--encrypt)
 fi
 
 # shellcheck disable=SC2034
