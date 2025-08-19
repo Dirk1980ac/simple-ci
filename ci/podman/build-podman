@@ -29,7 +29,6 @@ WORKDIR=""
 UPLOAD="false"
 BUILD_ID="missing"
 ARCHES=()
-param=()
 ENCRYPT="false"
 
 # Print a hopefully useful help text.
@@ -152,27 +151,27 @@ if [ ! -f "${LOCKFILE}" ]; then
 
 		if [ ${#ARCHES[@]} -gt 1 ]; then
 			for arch in "${ARCHES[@]}"; do
-
+				podman_args=()
 				# Use our own base image if we are building a ricv64 image
 				if [ "$arch" == "riscv64" ]; then
-					param+=(--from docker.io/dirk1980/fedora-riscv64:latest)
+					podman_args+=(--from docker.io/dirk1980/fedora-riscv64:latest)
 				fi
 
 				# Encrypt image if enabled
 				if [ "$ENCRYPT" == true ]; then
-					param+=(--encryption-key="$ENCRYPT_KEY")
+					podman_args+=(--encryption-key="$ENCRYPT_KEY")
 				fi
-
-				# shellcheck disable=SC2086
-				podman build \
-					"${param[@]}" \
-					--rm \
-					--arch "$arch" \
-					--build-arg "buildid=${BUILD_ID}" \
-					--security-opt label=type:unconfined_t \
-					--pull=always \
-					--network host \
+				podman_args+=(
+					--rm
+					--arch "$arch"
+					--build-arg "buildid=${BUILD_ID}"
+					--security-opt label=type:unconfined_t
+					--pull=always
+					--network host
 					-t "${REG_ADDR}/${REG_USER}/${PROJECT}:$arch" "${WORKDIR}"
+				)
+				# shellcheck disable=SC2086
+				podman build "${podman_args[@]}"
 
 				podman manifest add "${REG_ADDR}/${REG_USER}/${PROJECT}:latest" \
 					"${REG_ADDR}/${REG_USER}/${PROJECT}:$arch"
@@ -193,35 +192,40 @@ if [ ! -f "${LOCKFILE}" ]; then
 				"${REG_ADDR}/${REG_USER}/${PROJECT}:latest"
 		fi
 	elif [ ${#ARCHES[@]} -eq 1 ]; then
-		# Use our own base image if we are building a ricv64 image
-		if [ "$arch" == "riscv64" ]; then
-			param+=(--from docker.io/dirk1980/fedora-riscv64:latest)
-		fi
+		for arch in "${ARCHES[@]}"; do
+			podman_args=()
+			# Use our own base image if we are building a ricv64 image
+			if [ "$arch" == "riscv64" ]; then
+				podman_args+=(--from docker.io/dirk1980/fedora-riscv64:latest)
+			fi
 
-		# Encrypt image if enabled
-		if [ "$ENCRYPT" == true ]; then
-			param+=(--encryption-key="$ENCRYPT_KEY")
-		fi
+			# Encrypt image if enabled
+			if [ "$ENCRYPT" == true ]; then
+				podman_args+=(--encryption-key="$ENCRYPT_KEY")
+			fi
 
-		# shellcheck disable=SC2086
-		# Build single arch image
-		podman build \
-			"${param[@]}" \
-			--arch "${ARCHES[0]}" \
-			--rm \
-			--build-arg buildid="${BUILD_ID}" \
-			--security-opt label=type:unconfined_t \
-			--pull=always \
-			--network host \
-			-t "${REG_ADDR}/${REG_USER}/${PROJECT}:latest" "${WORKDIR}"
+			podman_args+=(
+				--arch "$arch"
+				--rm
+				--build-arg buildid="${BUILD_ID}"
+				--security-opt label=type:unconfined_t
+				--pull=always
+				--network host
+				-t "${REG_ADDR}/${REG_USER}/${PROJECT}:latest" "${WORKDIR}"
+			)
 
-		# Sign and Upload image to the registry if requested
-		if [ "$UPLOAD" == "true" ]; then
-			podman push \
-				--authfile "${AUTHFILE}" \
-				--sign-by-sigstore-private-key "${SIGN_PRIVATE_KEY}" \
-				--sign-passphrase-file "${SIGN_PASSWORD_FILE}" \
-				"${REG_ADDR}/${REG_USER}/${PROJECT}:latest"
-		fi
+			# shellcheck disable=SC2086
+			# Build single arch image
+			podman build "${podman_args[@]}"
+
+			# Sign and Upload image to the registry if requested
+			if [ "$UPLOAD" == "true" ]; then
+				podman push \
+					--authfile "${AUTHFILE}" \
+					--sign-by-sigstore-private-key "${SIGN_PRIVATE_KEY}" \
+					--sign-passphrase-file "${SIGN_PASSWORD_FILE}" \
+					"${REG_ADDR}/${REG_USER}/${PROJECT}:latest"
+			fi
+		done
 	fi
 fi
