@@ -7,19 +7,12 @@ set -eu
 
 # --- User ccnfiguration: ---
 
-# Registry information
-REG_USER="dirk1980" # Registry username (Used to generate the image path)
-REG_ADDR="docker.io" # Registry to use (Used to generate the image path)
-
-# Signature files
+REG_USER="" # Registry username (Used to generate the image path)
+REG_ADDR="" # Registry to use (Used to generate the image path)
 SIGN_PRIVATE_KEY="${HOME}/.ci/.podman/$REG_USER.private" # Private key for signing
 SIGN_PASSWORD_FILE="${HOME}/.ci/.podman/$REG_USER.pw" # Key password file
-
-# Encryption key
-ENCRYPT_KEY="jwe:${HOME}/.ci/.podman/$REG_USER-encrypt.pub" # Private key for signing
-
-# Podman authfile
-AUTHFILE="$HOME/.ci/.podman/auth.json" # Registry authentication token
+ENCRYPT_KEY="jwe:${HOME}/.ci/.podman/$REG_USER-encrypt.pub" # Encryption type and key
+AUTHFILE="$HOME/.ci/.podman/$REG_USER.json" # Registry authentication token
 
 # --- End of user configuration ---
 
@@ -30,6 +23,7 @@ UPLOAD="false"
 BUILD_ID="missing"
 ARCHES=()
 ENCRYPT="false"
+podman_args=()
 
 # Print a hopefully useful help text.
 help() {
@@ -54,7 +48,7 @@ Options:
   --arch
       Arch to build. Can be used multiple times to build multiple images.
 
-  --encrypt
+  -e, --encrypt
       Encrypt the image before push.
 
   -u, --upload
@@ -75,7 +69,7 @@ EOF
 }
 
 # Parse command line options
-if ! ARGS=$(getopt -o p:w:b:uha: --long project:,workdir:,build-id:,upload,help,arch:,encrypt -n "build-podman" -- "$@"); then
+if ! ARGS=$(getopt -o p:w:b:uha:e --long project:,workdir:,build-id:,upload,help,arch:,encrypt -n "build-podman" -- "$@"); then
 	echo "Error: Failed to parse options. Please check your command." >&2
 	help
 fi
@@ -107,7 +101,7 @@ while true; do
 		-h | --help)
 			help
 			;;
-		--encrypt)
+		-e | --encrypt)
 			ENCRYPT="true"
 			;;
 		--) # End of options
@@ -151,7 +145,6 @@ if [ ! -f "${LOCKFILE}" ]; then
 
 		if [ ${#ARCHES[@]} -gt 1 ]; then
 			for arch in "${ARCHES[@]}"; do
-				podman_args=()
 				# Use our own base image if we are building a ricv64 image
 				if [ "$arch" == "riscv64" ]; then
 					podman_args+=(--from docker.io/dirk1980/fedora-riscv64:latest)
@@ -193,7 +186,6 @@ if [ ! -f "${LOCKFILE}" ]; then
 		fi
 	elif [ ${#ARCHES[@]} -eq 1 ]; then
 		for arch in "${ARCHES[@]}"; do
-			podman_args=()
 			# Use our own base image if we are building a ricv64 image
 			if [ "$arch" == "riscv64" ]; then
 				podman_args+=(--from docker.io/dirk1980/fedora-riscv64:latest)
