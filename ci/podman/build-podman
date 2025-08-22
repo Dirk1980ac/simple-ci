@@ -103,6 +103,7 @@ while true; do
 			;;
 		-e | --encrypt)
 			ENCRYPT="true"
+			shift
 			;;
 		--) # End of options
 			shift
@@ -191,11 +192,6 @@ if [ ! -f "${LOCKFILE}" ]; then
 				podman_args+=(--from docker.io/dirk1980/fedora-riscv64:latest)
 			fi
 
-			# Encrypt image if enabled
-			if [ "$ENCRYPT" == true ]; then
-				podman_args+=(--encryption-key="$ENCRYPT_KEY")
-			fi
-
 			podman_args+=(
 				--arch "$arch"
 				--rm
@@ -212,11 +208,23 @@ if [ ! -f "${LOCKFILE}" ]; then
 
 			# Sign and Upload image to the registry if requested
 			if [ "$UPLOAD" == "true" ]; then
-				podman push \
-					--authfile "${AUTHFILE}" \
-					--sign-by-sigstore-private-key "${SIGN_PRIVATE_KEY}" \
-					--sign-passphrase-file "${SIGN_PASSWORD_FILE}" \
+
+				push_args=()
+
+				# Encrypt image if enabled
+				if [ "$ENCRYPT" == true ]; then
+					push_args+=(--encryption-key="$ENCRYPT_KEY")
+				fi
+
+				push_args+=(
+					--authfile "${AUTHFILE}"
+					--sign-by-sigstore-private-key "${SIGN_PRIVATE_KEY}"
+					--sign-passphrase-file "${SIGN_PASSWORD_FILE}"
 					"${REG_ADDR}/${REG_USER}/${PROJECT}:latest"
+
+				)
+
+				podman push "${push_args[@]}"
 			fi
 		done
 	fi
