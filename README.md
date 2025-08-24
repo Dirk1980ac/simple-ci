@@ -26,6 +26,6 @@ if it is not already in progress using a simple "lock file".
 * Also compile other projects (which use autotools, meson, cmake...) and
 eventually automatically build RPM packages.
 
-* Automatic tests of build container images (if they are not bootc images).
+* Automatic tests of built container images (if they are not bootc images).
 
 * Report the success or failure of a build and it's ID in some manner.
