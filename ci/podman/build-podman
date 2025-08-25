@@ -22,7 +22,6 @@ UPLOAD="false"
 BUILD_ID="missing"
 ARCHES=()
 ENCRYPT="false"
-podman_args=()
 RUN_HOST=""
 
 # Read configuration from ${HOME}/.config/ci/containers.conf if available
@@ -154,6 +153,7 @@ if [ ! -f "${LOCKFILE}" ]; then
 		podman manifest create "${REG_ADDR}/${REG_USER}/${PROJECT}:latest"
 
 		for arch in "${ARCHES[@]}"; do
+			podman_args=()
 			if [ "$arch" == "amd64" ] && [ -n "$AMD64_REMOTE" ]; then
 				RUN_HOST="$AMD64_REMOTE"
 			elif [ "$arch" == "arm64" ] && [ -n "$ARM64_REMOTE" ]; then
@@ -216,7 +216,7 @@ if [ ! -f "${LOCKFILE}" ]; then
 		fi
 	elif [ ${#ARCHES[@]} -eq 1 ]; then
 		for arch in "${ARCHES[@]}"; do
-
+			podman_args=()
 			if [ "$arch" == "amd64" ] && [ -n "$AMD64_REMOTE" ]; then
 				RUN_HOST="$AMD64_REMOTE"
 			elif [ "$arch" == "arm64" ] && [ -n "$ARM64_REMOTE" ]; then
