@@ -7,21 +7,13 @@ set -eu
 
 # Initialize script variables because we use 'set -u'
 # Do not edit these, use the cinfig file instead.
-REG_USER=""
-REG_ADDR=""
-SIGN_PRIVATE_KEY=""
-SIGN_PASSWORD_FILE=""
-ENCRYPT_KEY=""
-AUTHFILE=""
-AMD64_REMOTE=""
-ARM64_REMOTE=""
-RISCV64_REMOTE=""
 PROJECT=""
 WORKDIR=""
 UPLOAD="false"
+SIGN="false"
 BUILD_ID="missing"
 ARCHES=()
-ENCRYPT="false"
+# ENCRYPT="false"
 RUN_HOST=""
 
 # Read configuration from ${HOME}/.config/ci/containers.conf if available
@@ -29,7 +21,34 @@ if [ -f "${HOME}/.config/ci/container-build.conf" ]; then
 	# shellcheck source=/dev/null
 	. "${HOME}/.config/ci/container-build.conf"
 else
-	echo "Missing configuration file!"
+	cat << EOF > "${HOME}/.config/ci/container-build.conf"
+# Simple-ci container build configuration file
+
+# Repostory namespace (usually the username (Used to generate the image path)
+REG_USER=""
+
+# Registry address (only the domain name)
+REG_ADDR="" # Registry to use (Used to generate the image path)
+
+# Private
+SIGN_PRIVATE_KEY="" # Private key for signing
+SIGN_PASSWORD_FILE="" # Key password file
+AUTHFILE="" # Registry authentication token
+
+# Remote build hosts.
+# If empty: Uses quemu-static for the build if the requested architecture
+# is not the same as the hosts.
+# The remotes have to be set up as system connections in Podman and use their
+# 'friendly' names here.
+AMD64_REMOTE="" # x86_64 build host
+ARM64_REMOTE="" # aarch64 build host
+RISCV64_REMOTE="" # riscv64 build host
+EOF
+	exit 1
+fi
+
+if [ -z "$REG_USER" ] || [ -z "$REG_ADDR" ]; then
+	echo "Please edit the configuration file: ${HOME}/.config/ci/container-build.conf"
 	exit 1
 fi
 
@@ -77,7 +96,7 @@ EOF
 }
 
 # Parse command line options
-if ! ARGS=$(getopt -o p:w:b:uha:e --long project:,workdir:,build-id:,upload,help,arch:,encrypt -n "build-podman" -- "$@"); then
+if ! ARGS=$(getopt -o p:w:b:uha:se --long project:,workdir:,build-id:,upload,help,arch:,sign,encrypt -n "build-podman" -- "$@"); then
 	echo "Error: Failed to parse options. Please check your command." >&2
 	help
 fi
@@ -110,7 +129,13 @@ while true; do
 			help
 			;;
 		-e | --encrypt)
+			# Feature is disabled
+			# shellcheck disable=SC2034
 			ENCRYPT="true"
+			shift
+			;;
+		-s | --sign)
+			SIGN="true"
 			shift
 			;;
 		--) # End of options
@@ -171,11 +196,6 @@ if [ ! -f "${LOCKFILE}" ]; then
 				podman_args+=(--from docker.io/dirk1980/fedora-riscv64:latest)
 			fi
 
-			# Encrypt image if enabled
-			if [ "$ENCRYPT" == true ]; then
-				podman_args+=(--encryption-key="$ENCRYPT_KEY")
-			fi
-
 			podman_args+=(
 				--rm
 				--arch "$arch"
@@ -208,11 +228,26 @@ if [ ! -f "${LOCKFILE}" ]; then
 
 		# Sign and Upload image to the registry if requested
 		if [ "$UPLOAD" == "true" ]; then
-			podman manifest push \
-				--authfile "${AUTHFILE}" \
-				--sign-by-sigstore-private-key "${SIGN_PRIVATE_KEY}" \
-				--sign-passphrase-file "${SIGN_PASSWORD_FILE}" \
-				"${REG_ADDR}/${REG_USER}/${PROJECT}:latest"
+			push_args=(--authfile "${AUTHFILE}")
+
+			# Encrypt image if enabled
+			if [ "$ENCRYPT" == true ]; then
+				push_args+=(--encryption-key="$ENCRYPT_KEY")
+			fi
+
+			# Images are only signed if private key and password file are set.
+			# If they are not set or the file does not exist, then the image
+			# will be pushed unsigned.
+			if [ "$SIGN" == "true" ] && [ -f "${SIGN_PRIVATE_KEY}" ] &&
+				[ -f "${SIGN_PASSWORD_FILE}" ]; then
+				push_args+=(
+					--sign-by-sigstore-private-key "${SIGN_PRIVATE_KEY}"
+					--sign-passphrase-file "${SIGN_PASSWORD_FILE}")
+			fi
+
+			push_args+=("${REG_ADDR}/${REG_USER}/${PROJECT}:latest")
+
+			podman manifest push "${push_args[@]}"
 		fi
 	elif [ ${#ARCHES[@]} -eq 1 ]; then
 		for arch in "${ARCHES[@]}"; do
@@ -263,10 +298,18 @@ if [ ! -f "${LOCKFILE}" ]; then
 					push_args+=(--encryption-key="$ENCRYPT_KEY")
 				fi
 
+				# Images are only signed if private key and password file are set.
+				# If they are not set or the file does not exist, then the image
+				# will be pushed unsigned.
+				if [ "$SIGN" == "true" ] && [ -f "${SIGN_PRIVATE_KEY}" ] &&
+					[ -f "${SIGN_PASSWORD_FILE}" ]; then
+					push_args+=(
+						--sign-by-sigstore-private-key "${SIGN_PRIVATE_KEY}"
+						--sign-passphrase-file "${SIGN_PASSWORD_FILE}")
+				fi
+
 				push_args+=(
 					--authfile "${AUTHFILE}"
-					--sign-by-sigstore-private-key "${SIGN_PRIVATE_KEY}"
-					--sign-passphrase-file "${SIGN_PASSWORD_FILE}"
 					"${REG_ADDR}/${REG_USER}/${PROJECT}:latest"
 				)
 
