@@ -5,7 +5,7 @@
 # Exit on error and on unbound variables
 set -eu
 
-# Initialize script variables because we use 'set -u'
+# Initialize script variables because we use 'set -u' and set sane defaults.
 # Do not edit these, use the cinfig file instead.
 PROJECT=""
 WORKDIR=""
@@ -13,44 +13,10 @@ UPLOAD="false"
 SIGN="false"
 BUILD_ID="missing"
 ARCHES=()
-# ENCRYPT="false"
+ADD_KEYS="false"
+CONFIG="${HOME}/.config/simple-ci/container-build.conf"
+ENCRYPT="false"
 RUN_HOST=""
-
-# Read configuration from ${HOME}/.config/ci/containers.conf if available
-if [ -f "${HOME}/.config/ci/container-build.conf" ]; then
-	# shellcheck source=/dev/null
-	. "${HOME}/.config/ci/container-build.conf"
-else
-	cat << EOF > "${HOME}/.config/ci/container-build.conf"
-# Simple-ci container build configuration file
-
-# Repostory namespace (usually the username (Used to generate the image path)
-REG_USER=""
-
-# Registry address (only the domain name)
-REG_ADDR="" # Registry to use (Used to generate the image path)
-
-# Private
-SIGN_PRIVATE_KEY="" # Private key for signing
-SIGN_PASSWORD_FILE="" # Key password file
-AUTHFILE="" # Registry authentication token
-
-# Remote build hosts.
-# If empty: Uses quemu-static for the build if the requested architecture
-# is not the same as the hosts.
-# The remotes have to be set up as system connections in Podman and use their
-# 'friendly' names here.
-AMD64_REMOTE="" # x86_64 build host
-ARM64_REMOTE="" # aarch64 build host
-RISCV64_REMOTE="" # riscv64 build host
-EOF
-	exit 1
-fi
-
-if [ -z "$REG_USER" ] || [ -z "$REG_ADDR" ]; then
-	echo "Please edit the configuration file: ${HOME}/.config/ci/container-build.conf"
-	exit 1
-fi
 
 # Print a hopefully useful help text.
 help() {
@@ -96,12 +62,12 @@ EOF
 }
 
 # Parse command line options
-if ! ARGS=$(getopt -o p:w:b:uha:se --long project:,workdir:,build-id:,upload,help,arch:,sign,encrypt -n "build-podman" -- "$@"); then
+if ! ARGS=$(getopt -o p:w:b:uha:sekc: --long project:,workdir:,build-id:,upload,help,arch:,sign,encrypt,add-ssh-keys,config: -n "build-podman" -- "$@"); then
 	echo "Error: Failed to parse options. Please check your command." >&2
 	help
 fi
 
-eval set -- "$ARGS"
+eval set -- "${ARGS}"
 
 while true; do
 	case "$1" in
@@ -138,6 +104,14 @@ while true; do
 			SIGN="true"
 			shift
 			;;
+		-k | --add-ssh-keys)
+			ADD_KEYS="true"
+			shift
+			;;
+		-c | --config)
+			CONFIG=$2
+			shift 2
+			;;
 		--) # End of options
 			shift
 			break
@@ -149,13 +123,50 @@ while true; do
 	esac
 done
 
+# Read configuration from ${HOME}/.config/ci/containers.conf if available
+if [[ -f ${CONFIG}   ]]; then
+	# shellcheck source=/dev/null
+	. "${CONFIG}"
+else
+	cat << EOF > "${CONFIG}"
+# Simple-ci container build configuration file
+
+# Repostory namespace (usually the username (Used to generate the image path)
+REG_USER=""
+
+# Registry address (only the domain name)
+REG_ADDR="" # Registry to use (Used to generate the image path)
+
+# Private
+SIGN_PRIVATE_KEY="" # Private key for signing
+SIGN_PASSWORD_FILE="" # Key password file
+AUTHFILE="" # Registry authentication token
+SSH_KEYFILE=""
+
+# Remote build hosts.
+# If empty: Uses quemu-static for the build if the requested architecture
+# is not the same as the hosts.
+# The remotes have to be set up as system connections in Podman and use their
+# 'friendly' names here.
+AMD64_REMOTE="" # x86_64 build host
+ARM64_REMOTE="" # aarch64 build host
+RISCV64_REMOTE="" # riscv64 build host
+EOF
+	exit 1
+fi
+
+if [[ -z ${REG_USER} ]] || [[ -z ${REG_ADDR} ]]; then
+	echo "Please edit the configuration file: ${HOME}/.config/ci/container-build.conf"
+	exit 1
+fi
+
 # Show help if a mandatory option is missing
-if [ -z "$PROJECT" ] || [ -z "$BUILD_ID" ] || [ -z "$WORKDIR" ]; then
+if [[ -z ${PROJECT}   ]] || [[ -z ${BUILD_ID}   ]] || [[ -z ${WORKDIR}   ]]; then
 	echo "Error: Mandatory options --project, --build-id or --workdir missing." >&2
 	help
 fi
 
-LOCKFILE="$HOME/.ci/build/locks/.${PROJECT}-running"
+LOCKFILE="${HOME}/.ci/build/locks/.${PROJECT}-running"
 
 # cleanup function
 cleanup() {
@@ -167,79 +178,83 @@ cleanup() {
 trap cleanup EXIT
 
 # Check if the desired build is already running
-if [ ! -f "${LOCKFILE}" ]; then
+if [[ ! -f ${LOCKFILE}   ]]; then
 	# Lock the build to avoid concurrent builds of the same type.
 	touch "${LOCKFILE}"
 
 	# Build multi arch manifest ih requested
-	if [ ${#ARCHES[@]} -gt 1 ]; then
+	if [[ ${#ARCHES[@]} -gt 1 ]]; then
 		podman manifest exists "${REG_ADDR}/${REG_USER}/${PROJECT}:latest" &&
 			podman manifest rm "${REG_ADDR}/${REG_USER}/${PROJECT}:latest"
 		podman manifest create "${REG_ADDR}/${REG_USER}/${PROJECT}:latest"
 
 		for arch in "${ARCHES[@]}"; do
 			podman_args=()
-			if [ "$arch" == "amd64" ] && [ -n "$AMD64_REMOTE" ]; then
-				RUN_HOST="$AMD64_REMOTE"
-			elif [ "$arch" == "arm64" ] && [ -n "$ARM64_REMOTE" ]; then
-				RUN_HOST="$ARM64_REMOTE"
-			elif [ "$arch" == "riscv64" ] && [ -n "$RISCV64_REMOTE" ]; then
-				RUN_HOST="$RISCV64_REMOTE"
+			if [[ ${arch} == "amd64" ]] && [[ -n ${AMD64_REMOTE} ]]; then
+				RUN_HOST="${AMD64_REMOTE}"
+			elif [[ ${arch} == "arm64" ]] && [[ -n ${ARM64_REMOTE} ]]; then
+				RUN_HOST="${ARM64_REMOTE}"
+			elif [[ ${arch} == "riscv64" ]] && [[ -n ${RISCV64_REMOTE} ]]; then
+				RUN_HOST="${RISCV64_REMOTE}"
 			fi
 
-			if [ -n "$RUN_HOST" ]; then
-				podman_args+=(-c "$RUN_HOST")
+			if [[ ${ADD_KEYS} == true ]]; then
+				podman_args+=(--build-arg rootkeys="$(cat "${SSH_KEYFILE}")")
+			fi
+
+			if [[ -n ${RUN_HOST} ]]; then
+				podman_args+=(-c "${RUN_HOST}")
 			fi
 
 			# Use our own base image if we are building a ricv64 image
-			if [ "$arch" == "riscv64" ]; then
+			if [[ ${arch} == "riscv64" ]]; then
 				podman_args+=(--from docker.io/dirk1980/fedora-riscv64:latest)
 			fi
 
 			podman_args+=(
 				--rm
-				--arch "$arch"
+				--arch "${arch}"
 				--build-arg "buildid=${BUILD_ID}"
 				--security-opt label=type:unconfined_t
 				--pull=always
 				--network host
-				-t "${REG_ADDR}/${REG_USER}/${PROJECT}:$arch" "${WORKDIR}"
+				-t "${REG_ADDR}/${REG_USER}/${PROJECT}:${arch}" "${WORKDIR}"
 			)
 
 			# Run the build
 			podman build "${podman_args[@]}"
 
 			# Download imaghe from build host if we built remotely
-			if [ -n "$RUN_HOST" ]; then
+			if [[ -n ${RUN_HOST} ]]; then
 				podman image scp \
-					"$RUN_HOST::${REG_ADDR}/${REG_USER}/${PROJECT}:$arch" \
+					"${RUN_HOST}::${REG_ADDR}/${REG_USER}/${PROJECT}:${arch}" \
 					localhost::
 			fi
 
 			# Add image to manifest
 			podman manifest add "${REG_ADDR}/${REG_USER}/${PROJECT}:latest" \
-				"${REG_ADDR}/${REG_USER}/${PROJECT}:$arch"
+				"${REG_ADDR}/${REG_USER}/${PROJECT}:${arch}"
 		done
 
 		for arch in "${ARCHES[@]}"; do
 			# Remove trmporary tags.
-			podman image untag "${REG_ADDR}/${REG_USER}/${PROJECT}:$arch"
+			podman image untag "${REG_ADDR}/${REG_USER}/${PROJECT}:${arch}"
 		done
 
 		# Sign and Upload image to the registry if requested
-		if [ "$UPLOAD" == "true" ]; then
+		if [[ ${UPLOAD} == "true" ]]; then
 			push_args=(--authfile "${AUTHFILE}")
 
 			# Encrypt image if enabled
-			if [ "$ENCRYPT" == true ]; then
-				push_args+=(--encryption-key="$ENCRYPT_KEY")
+			if [[ ${ENCRYPT} == true ]]; then
+				push_args+=(--encryption-key="${ENCRYPT_KEY}")
 			fi
 
 			# Images are only signed if private key and password file are set.
 			# If they are not set or the file does not exist, then the image
 			# will be pushed unsigned.
-			if [ "$SIGN" == "true" ] && [ -f "${SIGN_PRIVATE_KEY}" ] &&
-				[ -f "${SIGN_PASSWORD_FILE}" ]; then
+			if [[ ${SIGN} == "true" ]] && [[ -f ${SIGN_PRIVATE_KEY} ]] &&
+				[[ -f ${SIGN_PASSWORD_FILE} ]]; then
 				push_args+=(
 					--sign-by-sigstore-private-key "${SIGN_PRIVATE_KEY}"
 					--sign-passphrase-file "${SIGN_PASSWORD_FILE}")
@@ -249,28 +264,32 @@ if [ ! -f "${LOCKFILE}" ]; then
 
 			podman manifest push "${push_args[@]}"
 		fi
-	elif [ ${#ARCHES[@]} -eq 1 ]; then
+	elif [[ ${#ARCHES[@]} -eq 1 ]]; then
 		for arch in "${ARCHES[@]}"; do
 			podman_args=()
-			if [ "$arch" == "amd64" ] && [ -n "$AMD64_REMOTE" ]; then
-				RUN_HOST="$AMD64_REMOTE"
-			elif [ "$arch" == "arm64" ] && [ -n "$ARM64_REMOTE" ]; then
-				RUN_HOST="$ARM64_REMOTE"
-			elif [ "$arch" == "riscv64" ] && [ -n "$RISCV64_REMOTE" ]; then
-				RUN_HOST="$RISCV64_REMOTE"
+			if [[ ${arch} == "amd64" ]] && [[ -n ${AMD64_REMOTE} ]]; then
+				RUN_HOST="${AMD64_REMOTE}"
+			elif [[ ${arch} == "arm64" ]] && [[ -n ${ARM64_REMOTE} ]]; then
+				RUN_HOST="${ARM64_REMOTE}"
+			elif [[ ${arch} == "riscv64" ]] && [[ -n ${RISCV64_REMOTE} ]]; then
+				RUN_HOST="${RISCV64_REMOTE}"
 			fi
 
-			if [ -n "$RUN_HOST" ]; then
-				podman_args+=(-c "$RUN_HOST")
+			if [[ -n ${RUN_HOST} ]]; then
+				podman_args+=(-c "${RUN_HOST}")
 			fi
 
 			# Use our own base image if we are building a ricv64 image
-			if [ "$arch" == "riscv64" ]; then
+			if [[ ${arch} == "riscv64" ]]; then
 				podman_args+=(--from docker.io/dirk1980/fedora-riscv64:latest)
 			fi
 
+			if [[ ${ADD_KEYS} == true ]]; then
+				podman_args+=(--build-arg sshkeys="$(cat "${SSH_KEYFILE}")")
+			fi
+
 			podman_args+=(
-				--arch "$arch"
+				--arch "${arch}"
 				--rm
 				--build-arg buildid="${BUILD_ID}"
 				--security-opt label=type:unconfined_t
@@ -283,26 +302,26 @@ if [ ! -f "${LOCKFILE}" ]; then
 			podman build "${podman_args[@]}"
 
 			# Download imaghe from build host if we built remotely
-			if [ -n "$RUN_HOST" ]; then
+			if [[ -n ${RUN_HOST} ]]; then
 				podman image scp \
-					"$RUN_HOST::${REG_ADDR}/${REG_USER}/${PROJECT}:$arch" \
+					"${RUN_HOST}::${REG_ADDR}/${REG_USER}/${PROJECT}:${arch}" \
 					localhost::
 			fi
 
 			# Sign and Upload image to the registry if requested
-			if [ "$UPLOAD" == "true" ]; then
+			if [[ ${UPLOAD} == "true" ]]; then
 				push_args=()
 
 				# Encrypt image if enabled
-				if [ "$ENCRYPT" == true ]; then
-					push_args+=(--encryption-key="$ENCRYPT_KEY")
+				if [[ ${ENCRYPT} == true ]]; then
+					push_args+=(--encryption-key="${ENCRYPT_KEY}")
 				fi
 
 				# Images are only signed if private key and password file are set.
 				# If they are not set or the file does not exist, then the image
 				# will be pushed unsigned.
-				if [ "$SIGN" == "true" ] && [ -f "${SIGN_PRIVATE_KEY}" ] &&
-					[ -f "${SIGN_PASSWORD_FILE}" ]; then
+				if [[ ${SIGN} == "true" ]] && [[ -f ${SIGN_PRIVATE_KEY} ]] &&
+					[[ -f ${SIGN_PASSWORD_FILE} ]]; then
 					push_args+=(
 						--sign-by-sigstore-private-key "${SIGN_PRIVATE_KEY}"
 						--sign-passphrase-file "${SIGN_PASSWORD_FILE}")

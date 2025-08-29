@@ -7,28 +7,31 @@ set -eu
 # Generate BUILD_ID
 BUILD_ID="$(date -u +%Y%m%d.%H%M)"
 
-# --- User ccnfiguration: ---
+# --- Project ccnfiguration: ---
 
 PROJECT="" # Project name
 ARCHES=() # Architectures to build ("arch1" "arch2" ...)
 ENCRYPT="false" # Encrypt the image before pushing it to the server
-WORKDIR="$HOME/.ci/build/${PROJECT}" # Working directory
-GIT_DIR="$HOME/repos/${PROJECT}.git" # .git directory
+WORKDIR="${HOME}/.ci/build/${PROJECT}" # Working directory
+GIT_DIR="${HOME}/repos/${PROJECT}.git" # .git directory
 BRANCH="master" # Branch for CI
-SCRIPT="$HOME/.ci/podman/build-podman" # Build script
-LOCK_BUILD="$HOME/.ci/build/locks/.${PROJECT}-running" # Lock file
-LOG_DIR="$HOME/.ci/build/logs" # Log directory
+SCRIPT="${HOME}/.ci/podman/build-podman" # Build script
+LOCK_BUILD="${HOME}/.ci/build/locks/.${PROJECT}-running" # Lock file
+LOG_DIR="${HOME}/.ci/build/logs" # Log directory
 LOG_FILE="${PROJECT}-${BUILD_ID}.log" # Log Filename
 SIGN="true" # Sign the image
+EMBED_KEYS="false"
+CUSTOM_CONF="" # Override default build configuration file
+
 # --- End user configuration ---
 
-if [[ $PROJECT = "" ]]; then
+if [[ -z ${PROJECT}   ]]; then
 	echo "Missing project name in git hook!"
 	exit 1
 fi
 
-if [ ! -d "$LOG_DIR" ]; then
-	mkdir -p "$LOG_DIR"
+if [[ ! -d ${LOG_DIR}   ]]; then
+	mkdir -p "${LOG_DIR}"
 fi
 
 # Set options for build script
@@ -39,34 +42,41 @@ script_params=(
 	--upload
 )
 
-if [ ${#ARCHES[@]} -gt 0 ]; then
+if [[ ${#ARCHES[@]} -gt 0 ]]; then
 	for arch in "${ARCHES[@]}"; do
-		script_params+=(--arch "$arch")
+		script_params+=(--arch "${arch}")
 	done
 fi
 
-if [ "$ENCRYPT" == "true" ]; then
+if  [[ -z ${CUSTOM_CONF} ]]; then
+	script_params+=(--config "${CUSTOM_CONF}")
+fi
+
+if [[ ${ENCRYPT} == "true" ]]; then
 	script_params+=(--encrypt)
 fi
 
-if [ "$SIGN" == "true" ]; then
+if [[ ${SIGN} == "true" ]]; then
 	script_params+=(--sign)
+fi
+
+if [[ ${EMBED_KEYS} == "true" ]]; then
+	script_params+=(--add-ssh-keys)
 fi
 
 # shellcheck disable=SC2034
 while read -r oldrev newrev ref; do
 	# Check if script is available and executable
-	if [ -x "${SCRIPT}" ]; then
+	if [[ -x ${SCRIPT} ]]; then
 		# Build image if refs/heads/master is received
-		if [ "$ref" = "refs/heads/${BRANCH}" ]; then
+		if [[ ${ref} == "refs/heads/${BRANCH}" ]]; then
 			# Check that there is no 'build lock'
-			if [ ! -f "${LOCK_BUILD}" ]; then
-				LOGFILE
+			if [[ ! -f ${LOCK_BUILD} ]]; then
 				# Report a started build
-				echo "Ref $ref received. Building image."
+				echo "Ref ${ref} received. Building image."
 
 				# Create workdir if it does not exist
-				if [ ! -d "${WORKDIR}" ]; then
+				if [[ ! -d ${WORKDIR} ]]; then
 					mkdir -p "${WORKDIR}"
 				fi
 
@@ -75,10 +85,11 @@ while read -r oldrev newrev ref; do
 
 				# Checkout git repository to workdir
 				git --work-tree="${WORKDIR}" --git-dir="${GIT_DIR}" \
-					checkout -f ${BRANCH}
+					checkout -f "${BRANCH}"
 
 				# Start build script in a subshell
-				(setsid bash "${SCRIPT}" "${script_params[@]}" < /dev/null &> "$LOG_DIR/$LOG_FILE" &) &
+				(setsid bash "${SCRIPT}" "${script_params[@]}" < /dev/null \
+					&> "${LOG_DIR}/${LOG_FILE}" &) &
 			else
 				# Report already running build if lock exists.
 				echo "Build is already running. Ignoring request."
