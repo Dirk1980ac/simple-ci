@@ -48,7 +48,7 @@ if [[ ${#ARCHES[@]} -gt 0 ]]; then
 	done
 fi
 
-if  [[ -z ${CUSTOM_CONF} ]]; then
+if  [[ -n ${CUSTOM_CONF} ]]; then
 	script_params+=(--config "${CUSTOM_CONF}")
 fi
 
