@@ -166,6 +166,8 @@ if [[ -z ${PROJECT}   ]] || [[ -z ${BUILD_ID}   ]] || [[ -z ${WORKDIR}   ]]; the
 	help
 fi
 
+cd "${WORKDIR}"
+
 LOCKFILE="${HOME}/.ci/build/locks/.${PROJECT}-running"
 
 # cleanup function
@@ -178,9 +180,13 @@ cleanup() {
 trap cleanup EXIT
 
 # Check if the desired build is already running
-if [[ ! -f ${LOCKFILE}   ]]; then
+if [[ ! -f ${LOCKFILE}  ]]; then
 	# Lock the build to avoid concurrent builds of the same type.
 	touch "${LOCKFILE}"
+
+	if [[ -d .git-crypt ]]; then
+		git --git-dir .git --work-tree . crypt unlock
+	fi
 
 	# Build multi arch manifest ih requested
 	if [[ ${#ARCHES[@]} -gt 1 ]]; then
