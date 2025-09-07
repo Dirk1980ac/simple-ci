@@ -205,7 +205,7 @@ if [[ ! -f ${LOCKFILE}  ]]; then
 			fi
 
 			if [[ ${ADD_KEYS} == true ]]; then
-				podman_args+=(--build-arg rootkeys="$(cat "${SSH_KEYFILE}")")
+				podman_args+=(--build-arg sshkeys="$(cat "${SSH_KEYFILE}")")
 			fi
 
 			if [[ -n ${RUN_HOST} ]]; then
