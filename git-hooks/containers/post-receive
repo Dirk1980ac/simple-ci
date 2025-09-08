@@ -80,7 +80,7 @@ while read -r oldrev newrev ref; do
 				fi
 
 				# Clone git dir in workdir.
-				git clone "${GIT_DIR}" "${WORKDIR}" crypt unlock
+				git clone "${GIT_DIR}" "${WORKDIR}"
 
 				# Start build script in a subshell
 				(setsid bash "${SCRIPT}" "${script_params[@]}" < /dev/null \
