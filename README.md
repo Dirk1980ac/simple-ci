@@ -38,14 +38,16 @@ sudo loginctl enable-linger <USER>
 - [x] Support container builds on a podman remote host as runner for e.g. a
       specific architecture.
 
+- [x] Support git-crypt encrypted files in repositories.
+
 - [x] Support build configurations using a custom configuration file.
+
+- [x] Log the build process.
 
 - [ ] Also compile other projects (which use autotools, meson, cmake...) and
       eventually automatically build RPM packages.
 
 - [ ] Automatic tests of built container images.
-
-- [ ] Report the success or failure of a build and it's ID in some manner.
 
 - [ ] Implement some (semi) automatic versioning scheme and system, especially
 for BootC Projects.
