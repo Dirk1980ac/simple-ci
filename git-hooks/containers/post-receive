@@ -4,83 +4,76 @@
 
 set -eu
 
+PROJECT="" # Project name
+
 # Generate BUILD_ID
 BUILD_ID="$(date -u +%Y%m%d.%H%M)"
 
-# --- Project ccnfiguration: ---
-
-PROJECT="" # Project name
-ARCHES=() # Architectures to build ("arch1" "arch2" ...)
-ENCRYPT="false" # Encrypt the image before pushing it to the server
-WORKDIR="${HOME}/.ci/build/${PROJECT}" # Working directory
-GIT_DIR="${HOME}/repos/${PROJECT}.git" # .git directory
-BRANCH="master" # Branch for CI
-SCRIPT="${HOME}/.ci/podman/build-podman" # Build script
-LOCK_BUILD="${HOME}/.ci/build/locks/.${PROJECT}-running" # Lock file
-LOG_DIR="${HOME}/.ci/build/logs" # Log directory
-LOG_FILE="${PROJECT}-${BUILD_ID}.log" # Log Filename
-SIGN="true" # Sign the image
-EMBED_KEYS="false"
-CUSTOM_CONF="" # Override default build configuration file
-
-# --- End user configuration ---
-
-if [[ -z ${PROJECT}   ]]; then
+if    [[ -z ${PROJECT} ]]; then
 	echo "Missing project name in git hook!"
 	exit 1
 fi
 
+WORKDIR="${HOME}/.ci/build/${PROJECT}" # Working directory
+GIT_DIR="${HOME}/repos/${PROJECT}.git" # .git directory
+LOCK_BUILD="${HOME}/.ci/build/locks/.${PROJECT}-running" # Lock file
+LOG_DIR="${HOME}/.ci/build/logs" # Log directory
+LOG_FILE="${PROJECT}-${BUILD_ID}.log" # Log Filename
+SCRIPT="${HOME}/.ci/podman/build-podman" # Build script
+
 if [[ ! -d ${LOG_DIR}   ]]; then
 	mkdir -p "${LOG_DIR}"
-fi
-
-# Set options for build script
-script_params=(
-	--project="${PROJECT}"
-	--workdir="${WORKDIR}"
-	--build-id="${BUILD_ID}"
-	--upload
-)
-
-if [[ ${#ARCHES[@]} -gt 0 ]]; then
-	for arch in "${ARCHES[@]}"; do
-		script_params+=(--arch "${arch}")
-	done
-fi
-
-if  [[ -n ${CUSTOM_CONF} ]]; then
-	script_params+=(--config "${CUSTOM_CONF}")
-fi
-
-if [[ ${ENCRYPT} == "true" ]]; then
-	script_params+=(--encrypt)
-fi
-
-if [[ ${SIGN} == "true" ]]; then
-	script_params+=(--sign)
-fi
-
-if [[ ${EMBED_KEYS} == "true" ]]; then
-	script_params+=(--add-ssh-keys)
 fi
 
 # shellcheck disable=SC2034
 while read -r oldrev newrev ref; do
 	# Check if script is available and executable
 	if [[ -x ${SCRIPT} ]]; then
-		# Build image if refs/heads/master is received
-		if [[ ${ref} == "refs/heads/${BRANCH}" ]]; then
-			# Check that there is no 'build lock'
+
+		BRANCH=${ref##refs/heads/}
+
+		if [[ -d ${WORKDIR} ]]; then
+			rm -rf "${WORKDIR}"
+		fi
+
+		# Clone git dir in workdir.
+		git clone --branch "${BRANCH}" "${GIT_DIR}" "${WORKDIR}"
+		cd "${WORKDIR}"
+
+		if [[ -f ${WORKDIR}/.simple-ci/${BRANCH}/podman.conf ]]; then
+			# shellcheck source=/dev/null
+			source "${WORKDIR}/.simple-ci/${BRANCH}/podman.conf"
+
+			if [[ ${#ARCHES[@]} -gt 0 ]]; then
+				for arch in "${ARCHES[@]}"; do
+					script_params+=(--arch "${arch}")
+				done
+			fi
+
+			if [[ ${ENCRYPT} == "true" ]]; then
+				script_params+=(--encrypt)
+			fi
+
+			if [[ ${SIGN} == "true" ]]; then
+				script_params+=(--sign)
+			fi
+
+			if [[ ${EMBED_KEYS} == "true" ]]; then
+				script_params+=(--add-ssh-keys)
+			fi
+
+			# Set options for build script
+			script_params=(
+				--project="${PROJECT}"
+				--workdir="${WORKDIR}"
+				--build-id="${BUILD_ID}"
+				--upload
+				-c "${WORKDIR}/.simple-ci/${BRANCH}/podman.conf"
+			)
+
 			if [[ ! -f ${LOCK_BUILD} ]]; then
 				# Report a started build
-				echo "Ref ${ref} received. Building image."
-
-				if [[ -d ${WORKDIR} ]]; then
-					rm -rf "${WORKDIR}"
-				fi
-
-				# Clone git dir in workdir.
-				git clone "${GIT_DIR}" "${WORKDIR}"
+				echo "${BRANCH} received. Building image."
 
 				# Start build script in a subshell
 				(setsid bash "${SCRIPT}" "${script_params[@]}" < /dev/null \
@@ -89,6 +82,8 @@ while read -r oldrev newrev ref; do
 				# Report already running build if lock exists.
 				echo "Build is already running. Ignoring request."
 			fi
+		else # TODO: Implement other Builds as elif here.
+			rm -rf "${WORKDIR}"
 		fi
 	else
 		# Report missing build script

@@ -1,6 +1,13 @@
-# Simple-ci container build configuration file
+# Simple-ci build configuration file
 
-# Repostory namespace (usually the username (Used to generate the image path)
+TAG="latest"
+ARCHES=() # Architectures to build ("arch1" "arch2" ...)
+ENCRYPT="false" # Encrypt the image before pushing it to the server
+ENCRYPT_KEY=""
+SIGN="true" # Sign the image
+EMBED_KEYS="false"
+
+# Repostory namespace (usually the username - used to generate the image path)
 REG_USER=""
 
 # Registry address (only the domain name)
@@ -16,7 +23,7 @@ SSH_KEYFILE=""
 
 # Remote build hosts.
 # If empty: Uses quemu-static for the build if the requested architecture
-# is not the same as the hosts.
+# is not the same as the host.
 # The remotes have to be set up as system connections in Podman and use their
 # 'friendly' names here.
 AMD64_REMOTE="" # x86_64 build host

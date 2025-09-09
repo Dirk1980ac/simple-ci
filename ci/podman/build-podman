@@ -14,7 +14,7 @@ SIGN="false"
 BUILD_ID="missing"
 ARCHES=()
 ADD_KEYS="false"
-CONFIG="${HOME}/.config/simple-ci/container-build.conf"
+CONFIG=""
 ENCRYPT="false"
 RUN_HOST=""
 
@@ -123,47 +123,24 @@ while true; do
 	esac
 done
 
-# Read configuration from ${HOME}/.config/ci/containers.conf if available
-if [[ -f ${CONFIG}   ]]; then
-	# shellcheck source=/dev/null
-	. "${CONFIG}"
-else
-	cat << EOF > "${CONFIG}"
-# Simple-ci container build configuration file
-
-# Repostory namespace (usually the username (Used to generate the image path)
-REG_USER=""
-
-# Registry address (only the domain name)
-REG_ADDR="" # Registry to use (Used to generate the image path)
-
-# Private
-SIGN_PRIVATE_KEY="" # Private key for signing
-SIGN_PASSWORD_FILE="" # Key password file
-AUTHFILE="" # Registry authentication token
-SSH_KEYFILE=""
-
-# Remote build hosts.
-# If empty: Uses quemu-static for the build if the requested architecture
-# is not the same as the hosts.
-# The remotes have to be set up as system connections in Podman and use their
-# 'friendly' names here.
-AMD64_REMOTE="" # x86_64 build host
-ARM64_REMOTE="" # aarch64 build host
-RISCV64_REMOTE="" # riscv64 build host
-EOF
-	exit 1
-fi
-
-if [[ -z ${REG_USER} ]] || [[ -z ${REG_ADDR} ]]; then
-	echo "Please edit the configuration file: ${HOME}/.config/ci/container-build.conf"
-	exit 1
-fi
-
 # Show help if a mandatory option is missing
 if [[ -z ${PROJECT}   ]] || [[ -z ${BUILD_ID}   ]] || [[ -z ${WORKDIR}   ]]; then
 	echo "Error: Mandatory options --project, --build-id or --workdir missing." >&2
 	help
+fi
+
+# Read configuration from ${HOME}/.config/ci/containers.conf if available
+if [[ -z ${CONFIG} ]] || [[ ! -f ${CONFIG} ]]; then
+	echo "Missing config file!"
+	exit 1
+else
+	# shellcheck source=/dev/null
+	. "${CONFIG}"
+fi
+
+if [[ -z ${REG_USER} ]] || [[ -z ${REG_ADDR} ]]; then
+	echo "Please edit the configuration file!"
+	exit 1
 fi
 
 cd "${WORKDIR}"
@@ -181,18 +158,20 @@ trap cleanup EXIT
 
 # Check if the desired build is already running
 if [[ ! -f ${LOCKFILE}  ]]; then
-	# Lock the build to avoid concurrent builds of the same type.
-	touch "${LOCKFILE}"
 
+	# Unlock repository if git-crypt is used
 	if [[ -d .git-crypt ]]; then
 		git --git-dir .git --work-tree . crypt unlock
 	fi
 
+	# Lock the build to avoid concurrent builds of the same type.
+	touch "${LOCKFILE}"
+
 	# Build multi arch manifest ih requested
 	if [[ ${#ARCHES[@]} -gt 1 ]]; then
-		podman manifest exists "${REG_ADDR}/${REG_USER}/${PROJECT}:latest" &&
-			podman manifest rm "${REG_ADDR}/${REG_USER}/${PROJECT}:latest"
-		podman manifest create "${REG_ADDR}/${REG_USER}/${PROJECT}:latest"
+		podman manifest exists "${REG_ADDR}/${REG_USER}/${PROJECT}:${TAG}" &&
+			podman manifest rm "${REG_ADDR}/${REG_USER}/${PROJECT}:${TAG}"
+		podman manifest create "${REG_ADDR}/${REG_USER}/${PROJECT}:${TAG}"
 
 		for arch in "${ARCHES[@]}"; do
 			podman_args=()
@@ -224,7 +203,7 @@ if [[ ! -f ${LOCKFILE}  ]]; then
 				--security-opt label=type:unconfined_t
 				--pull=always
 				--network host
-				-t "${REG_ADDR}/${REG_USER}/${PROJECT}:${arch}" "${WORKDIR}"
+				-t "${REG_ADDR}/${REG_USER}/${PROJECT}:${TAG}-${arch}" "${WORKDIR}"
 			)
 
 			# Run the build
@@ -233,18 +212,18 @@ if [[ ! -f ${LOCKFILE}  ]]; then
 			# Download imaghe from build host if we built remotely
 			if [[ -n ${RUN_HOST} ]]; then
 				podman image scp \
-					"${RUN_HOST}::${REG_ADDR}/${REG_USER}/${PROJECT}:${arch}" \
+					"${RUN_HOST}::${REG_ADDR}/${REG_USER}/${PROJECT}:${TAG}-${arch}" \
 					localhost::
 			fi
 
 			# Add image to manifest
-			podman manifest add "${REG_ADDR}/${REG_USER}/${PROJECT}:latest" \
-				"${REG_ADDR}/${REG_USER}/${PROJECT}:${arch}"
+			podman manifest add "${REG_ADDR}/${REG_USER}/${PROJECT}:${TAG}" \
+				"${REG_ADDR}/${REG_USER}/${PROJECT}:${TAG}-${arch}"
 		done
 
 		for arch in "${ARCHES[@]}"; do
 			# Remove trmporary tags.
-			podman image untag "${REG_ADDR}/${REG_USER}/${PROJECT}:${arch}"
+			podman image untag "${REG_ADDR}/${REG_USER}/${PROJECT}:${TAG}-${arch}"
 		done
 
 		# Sign and Upload image to the registry if requested
@@ -266,7 +245,7 @@ if [[ ! -f ${LOCKFILE}  ]]; then
 					--sign-passphrase-file "${SIGN_PASSWORD_FILE}")
 			fi
 
-			push_args+=("${REG_ADDR}/${REG_USER}/${PROJECT}:latest")
+			push_args+=("${REG_ADDR}/${REG_USER}/${PROJECT}:${TAG}")
 
 			podman manifest push "${push_args[@]}"
 		fi
@@ -301,7 +280,7 @@ if [[ ! -f ${LOCKFILE}  ]]; then
 				--security-opt label=type:unconfined_t
 				--pull=always
 				--network host
-				-t "${REG_ADDR}/${REG_USER}/${PROJECT}:latest" "${WORKDIR}"
+				-t "${REG_ADDR}/${REG_USER}/${PROJECT}:${TAG}" "${WORKDIR}"
 			)
 
 			# Build single arch image
@@ -310,7 +289,7 @@ if [[ ! -f ${LOCKFILE}  ]]; then
 			# Download imaghe from build host if we built remotely
 			if [[ -n ${RUN_HOST} ]]; then
 				podman image scp \
-					"${RUN_HOST}::${REG_ADDR}/${REG_USER}/${PROJECT}:${arch}" \
+					"${RUN_HOST}::${REG_ADDR}/${REG_USER}/${PROJECT}:${TAG}" \
 					localhost::
 			fi
 
@@ -335,11 +314,16 @@ if [[ ! -f ${LOCKFILE}  ]]; then
 
 				push_args+=(
 					--authfile "${AUTHFILE}"
-					"${REG_ADDR}/${REG_USER}/${PROJECT}:latest"
+					"${REG_ADDR}/${REG_USER}/${PROJECT}:${TAG}"
 				)
 
 				podman push "${push_args[@]}"
 			fi
 		done
+	fi
+
+	# Lock repository after run if git-crypt is used.
+	if  [[ -d .git-crypt ]]; then
+		git --git-dir .git --work-tree . crypt lock
 	fi
 fi

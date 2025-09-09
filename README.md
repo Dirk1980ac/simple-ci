@@ -16,13 +16,12 @@ sudo loginctl enable-linger <USER>
 
 ## Features
 
-- Supports per project build configuration files.
+- In-repo build configuration files.
 - No additional git repository solution neccessary.
 - Can be run in any repository on any machine where you have ssh access to.
 - Uses lock files to avoid concurrent builds of the same image to avoid race conditions.
-- Runs in the (ssh) users context so it is useful for single developers as well
-  as for Teams
-- Entirely written in bash
+- Runs in the (ssh) users context.
+- Entirely written in bash.
 - Highly extensible.
 - Automatically integrates with FreeIPA and GSSAPI because it does generally not
   rely on external software for itself.
@@ -36,13 +35,15 @@ sudo loginctl enable-linger <USER>
 ## TODO (planned)
 
 - [x] Support container builds on a podman remote host as runner for e.g. a
-      specific architecture.
+specific architecture.
 
 - [x] Support git-crypt encrypted files in repositories.
 
 - [x] Support build configurations using a custom configuration file.
 
 - [x] Log the build process.
+
+- [x] Support in-repo configuration.
 
 - [ ] Also compile other projects (which use autotools, meson, cmake...) and
       eventually automatically build RPM packages.
