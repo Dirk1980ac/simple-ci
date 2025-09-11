@@ -135,7 +135,7 @@ if [[ -z ${CONFIG} ]] || [[ ! -f ${CONFIG} ]]; then
 	exit 1
 else
 	# shellcheck source=/dev/null
-	. "${CONFIG}"
+	source "${CONFIG}"
 fi
 
 if [[ -z ${REG_USER} ]] || [[ -z ${REG_ADDR} ]]; then
@@ -145,7 +145,11 @@ fi
 
 cd "${WORKDIR}"
 
-LOCKFILE="${HOME}/.ci/build/locks/.${PROJECT}-running"
+if   [[ -z ${TAG} ]]; then
+	TAG="latest"
+fi
+
+LOCKFILE="${HOME}/.ci/build/locks/.${PROJECT}-${TAG}-running"
 
 # cleanup function
 cleanup() {
@@ -323,7 +327,7 @@ if [[ ! -f ${LOCKFILE}  ]]; then
 	fi
 
 	# Lock repository after run if git-crypt is used.
-	if  [[ -d .git-crypt ]]; then
+	if [[ -d .git-crypt ]]; then
 		git --git-dir .git --work-tree . crypt lock
 	fi
 fi
