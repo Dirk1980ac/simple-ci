@@ -18,15 +18,6 @@ WORKDIR="${HOME}/.ci/build/${PROJECT}" # Working directory
 GIT_DIR="${HOME}/repos/${PROJECT}.git" # .git directory
 TAG="" # Initialize to avoid unbound variable
 
-# Set options for build script
-script_params+=(
-	--project="${PROJECT}"
-	--workdir="${WORKDIR}"
-	--build-id="${BUILD_ID}"
-	--upload
-	-c "${CFGFILE}"
-)
-
 # shellcheck disable=SC2034
 while read -r oldrev newrev ref; do
 	# Check if script is available and executable
@@ -41,6 +32,15 @@ while read -r oldrev newrev ref; do
 	git clone --branch "${BRANCH}" "${GIT_DIR}" "${WORKDIR}"
 	cd "${WORKDIR}"
 	CFGFILE="${WORKDIR}/.simple-ci/${BRANCH}.conf"
+
+	# Set options for build script
+	script_params+=(
+		--project="${PROJECT}"
+		--workdir="${WORKDIR}"
+		--build-id="${BUILD_ID}"
+		--config "${CFGFILE}"
+	)
+
 	if [[ -f ${CFGFILE} ]]; then
 		# shellcheck source=/dev/null
 		source "${WORKDIR}/.simple-ci/${BRANCH}.conf"
@@ -76,6 +76,9 @@ while read -r oldrev newrev ref; do
 			fi
 		elif [[ ${PIPELINE} == "generic" ]]; then
 			SCRIPT="${HOME}/.ci/scripts/build-generic" # Build script
+			LOCK_BUILD="${HOME}/.ci/build/locks/.${PROJECT}-running"
+			LOG_FILE="${HOME}/.ci/build/logs/${PROJECT}-${BUILD_ID}.log" # Log Filename
+
 			# TODO: Implement generic builds here.
 			(setsid bash "${SCRIPT}" "${script_params[@]}" < /dev/null \
 				&> "${LOG_FILE}" &) &
