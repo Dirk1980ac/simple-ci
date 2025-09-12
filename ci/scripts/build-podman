@@ -163,7 +163,8 @@ if [[ ! -f ${LOCKFILE}  ]]; then
 				podman_args+=(-c "${RUN_HOST}")
 			fi
 
-			# Use our own base image if we are building a ricv64 image
+			# Use our own base image if we are building a ricv64 image as long
+			# as Fedora does not provide an official base image.
 			if [[ ${arch} == "riscv64" ]]; then
 				podman_args+=(--from docker.io/dirk1980/fedora-riscv64:latest)
 			fi

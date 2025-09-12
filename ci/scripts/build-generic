@@ -116,8 +116,10 @@ for arch in "${ARCHES[@]}"; do
 
 	podman_args+=(
 		--rm
+		--pull=always
 		--arch "${arch}"
-		-v "${WORKDIR}:/app"
+		--security-opt label=type:unconfined_t
+		-v "${WORKDIR}:/workdir"
 		-v "${OUTPUT_DIR}:/root/rpmbuild"
 		"${RUNNER}"
 		"${BUILDSCRIPT}"
