@@ -117,7 +117,7 @@ if   [[ -z ${TAG} ]]; then
 	TAG="latest"
 fi
 
-LOCKFILE="${HOME}/.ci/build/locks/.${PROJECT}-${TAG}-running"
+LOCKFILE="${HOME}/.ci/lock/.${PROJECT}-${TAG}-running"
 
 # cleanup function
 cleanup() {

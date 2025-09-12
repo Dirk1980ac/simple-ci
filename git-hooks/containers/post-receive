@@ -17,6 +17,15 @@ fi
 WORKDIR="${HOME}/.ci/build/${PROJECT}" # Working directory
 GIT_DIR="${HOME}/repos/${PROJECT}.git" # .git directory
 TAG="" # Initialize to avoid unbound variable
+LOG_DIR="${HOME}/.ci/logs"
+LOCK_DIR="${HOME}/.ci/lock"
+
+if [[ ! -d ${LOG_DIR} ]]; then
+	mkdir -p "${LOG_DIR}"
+fi
+if [[ ! -d ${LOCK_DIR} ]]; then
+	mkdir -p "${LOCK_DIR}"
+fi
 
 # shellcheck disable=SC2034
 while read -r oldrev newrev ref; do
@@ -60,12 +69,12 @@ while read -r oldrev newrev ref; do
 				mkdir -p "${HOME}/.ci/build/locks"
 			fi
 
-			LOCK_BUILD="${HOME}/.ci/build/locks/.${PROJECT}-${TAG}-running"
-			LOG_FILE="${HOME}/.ci/build/logs/${PROJECT}-${TAG}-${BUILD_ID}.log" # Log Filename
+			LOCK_BUILD="${LOCK_DIR}/.${PROJECT}-${TAG}-running"
+			LOG_FILE="${LOG_DIR}/${PROJECT}-${TAG}-${BUILD_ID}.log" # Log Filename
 
 			if [[ ! -f ${LOCK_BUILD} ]]; then
 				# Report a started build
-				echo "${BRANCH} received. Building image."
+				echo "Build starting fir '${TAG}'."
 
 				# Start build script in a subshell
 				(setsid bash "${SCRIPT}" "${script_params[@]}" < /dev/null \
@@ -76,13 +85,18 @@ while read -r oldrev newrev ref; do
 			fi
 		elif [[ ${PIPELINE} == "generic" ]]; then
 			SCRIPT="${HOME}/.ci/scripts/build-generic" # Build script
-			LOCK_BUILD="${HOME}/.ci/build/locks/.${PROJECT}-running"
-			LOG_FILE="${HOME}/.ci/build/logs/${PROJECT}-${BUILD_ID}.log" # Log Filename
+			LOCK_BUILD="${LOCK_DIR}/.${PROJECT}-running"
+			LOG_FILE="${LOG_DIR}/${PROJECT}-${BUILD_ID}.log" # Log Filename
 
-			# TODO: Implement generic builds here.
-			(setsid bash "${SCRIPT}" "${script_params[@]}" < /dev/null \
-				&> "${LOG_FILE}" &) &
-			exit 1
+			if [[ ! -f ${LOCK_BUILD} ]]; then
+				echo "Starting generic Build."
+				(setsid bash "${SCRIPT}" "${script_params[@]}" < /dev/null \
+					&> "${LOG_FILE}" &) &
+				exit 1
+			else
+				# Report already running build if lock exists.
+				echo "Build is already running. Ignoring request."
+			fi
 		else
 			rm -rf "${WORKDIR}"
 		fi

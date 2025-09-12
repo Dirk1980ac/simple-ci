@@ -83,6 +83,17 @@ while true; do
 	esac
 done
 
+LOCKFILE="${HOME}/.ci/lock/.${PROJECT}-running"
+
+# cleanup function
+cleanup() {
+	# Remove lock file
+	rm -f "${LOCKFILE}"
+}
+
+# Trap for cleanup: Ensures lock file is removed even on script to error or signal.
+trap cleanup EXIT
+
 # Show help if a mandatory option is missing
 if [[ -z ${PROJECT}   ]] || [[ -z ${BUILD_ID}   ]] || [[ -z ${WORKDIR}   ]]; then
 	echo "Error: Mandatory options --project, --build-id or --workdir missing." >&2
@@ -99,32 +110,35 @@ else
 	source "${CONFIG}"
 fi
 
-for arch in "${ARCHES[@]}"; do
-	podman_args=()
+if [[ ! -f ${LOCKFILE}  ]]; then
+	touch "${LOCKFILE}"
+	for arch in "${ARCHES[@]}"; do
+		podman_args=()
 
-	if [[ ${arch} == "amd64" ]] && [[ -n ${AMD64_REMOTE} ]]; then
-		RUN_HOST="${AMD64_REMOTE}"
-	elif [[ ${arch} == "arm64" ]] && [[ -n ${ARM64_REMOTE} ]]; then
-		RUN_HOST="${ARM64_REMOTE}"
-	elif [[ ${arch} == "riscv64" ]] && [[ -n ${RISCV64_REMOTE} ]]; then
-		RUN_HOST="${RISCV64_REMOTE}"
-	fi
+		if [[ ${arch} == "amd64" ]] && [[ -n ${AMD64_REMOTE} ]]; then
+			RUN_HOST="${AMD64_REMOTE}"
+		elif [[ ${arch} == "arm64" ]] && [[ -n ${ARM64_REMOTE} ]]; then
+			RUN_HOST="${ARM64_REMOTE}"
+		elif [[ ${arch} == "riscv64" ]] && [[ -n ${RISCV64_REMOTE} ]]; then
+			RUN_HOST="${RISCV64_REMOTE}"
+		fi
 
-	if [[ -n ${RUN_HOST} ]]; then
-		podman_args+=(-c "${RUN_HOST}")
-	fi
+		if [[ -n ${RUN_HOST} ]]; then
+			podman_args+=(-c "${RUN_HOST}")
+		fi
 
-	podman_args+=(
-		--rm
-		--pull=always
-		--arch "${arch}"
-		--security-opt label=type:unconfined_t
-		-v "${WORKDIR}:/workdir"
-		-v "${OUTPUT_DIR}:/root/rpmbuild"
-		"${RUNNER}"
-		"${BUILDSCRIPT}"
-		"${SCRIPT_ARGS}"
-	)
+		podman_args+=(
+			--rm
+			--pull=always
+			--arch "${arch}"
+			--security-opt label=type:unconfined_t
+			-v "${WORKDIR}:/workdir"
+			-v "${OUTPUT_DIR}:/root/rpmbuild"
+			"${RUNNER}"
+			"${BUILDSCRIPT}"
+			"${SCRIPT_ARGS}"
+		)
 
-	timeout 2h podman run "${podman_args[@]}"
-done
+		timeout 2h podman run "${podman_args[@]}"
+	done
+fi
