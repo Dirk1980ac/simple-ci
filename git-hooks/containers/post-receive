@@ -55,7 +55,7 @@ while read -r oldrev newrev ref; do
 		source "${WORKDIR}/.simple-ci/${BRANCH}.conf"
 		if [[ ${PIPELINE} == "podman" ]]; then
 
-			SCRIPT="${HOME}/.ci/scripts/build-podsman" # Build script
+			SCRIPT="${HOME}/.ci/scripts/build-podman" # Build script
 			if [[ ! -x ${SCRIPT} ]]; then
 				# Report missing build script
 				echo "Builder script missing."
