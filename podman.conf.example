@@ -1,5 +1,6 @@
 # Simple-ci build configuration file
 
+PIPELINE="podman"
 TAG="latest"
 ARCHES=() # Architectures to build ("arch1" "arch2" ...)
 ENCRYPT="false" # Encrypt the image before pushing it to the server
@@ -13,10 +14,13 @@ REG_USER=""
 # Registry address (only the domain name)
 REG_ADDR="" # Registry to use (Used to generate the image path)
 
-# Private
+# Registry credentials and signature settings
 SIGN_PRIVATE_KEY="" # Private key for signing
 SIGN_PASSWORD_FILE="" # Key password file
 AUTHFILE="" # Registry authentication token
+
+# Push image to regiostry after Build
+UPLOAD="true"
 
 # Root SSH key file to embed if requested
 SSH_KEYFILE=""

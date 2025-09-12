@@ -27,6 +27,8 @@ This script builds a multi-architecture Podman image for a specified project
 and can optionally upload it, targeting either a 'stable' or 'nightly' release.
 
 Options:
+  -c, --config
+      Configuration file.
   -p <project>, --project=<project>
       Sets the **project name**. This option is **mandatory**.
 
@@ -37,17 +39,6 @@ Options:
   -b <id>, --build-id=<id>
       Assigns a **build ID** to the image, which can be used for versioning or tracking.
       This option is **mandatory**.
-
-  --arch
-      Arch to build. Can be used multiple times to build multiple images.
-
-  -e, --encrypt
-      Encrypt the image before push.
-
-  -u, --upload
-      If provided, the built image will be **uploaded** (pushed) to the configured server.
-      For 'stable' builds, the image will also be pushed as 'latest'.
-      This option is optional.
 
   -h, --help
       Displays this help message and exits.
@@ -62,7 +53,7 @@ EOF
 }
 
 # Parse command line options
-if ! ARGS=$(getopt -o p:w:b:uha:sekc: --long project:,workdir:,build-id:,upload,help,arch:,sign,encrypt,add-ssh-keys,config: -n "build-podman" -- "$@"); then
+if ! ARGS=$(getopt -o p:w:b:hc: --long project:,workdir:,build-id:,help,,config: -n "build-podman" -- "$@"); then
 	echo "Error: Failed to parse options. Please check your command." >&2
 	help
 fi
@@ -83,30 +74,8 @@ while true; do
 			BUILD_ID=$2
 			shift 2
 			;;
-		-a | --arch)
-			ARCHES+=("$2")
-			shift 2
-			;;
-		-u | --upload)
-			UPLOAD="true"
-			shift
-			;;
 		-h | --help)
 			help
-			;;
-		-e | --encrypt)
-			# Feature is disabled
-			# shellcheck disable=SC2034
-			ENCRYPT="true"
-			shift
-			;;
-		-s | --sign)
-			SIGN="true"
-			shift
-			;;
-		-k | --add-ssh-keys)
-			ADD_KEYS="true"
-			shift
 			;;
 		-c | --config)
 			CONFIG=$2
@@ -128,6 +97,7 @@ if [[ -z ${PROJECT}   ]] || [[ -z ${BUILD_ID}   ]] || [[ -z ${WORKDIR}   ]]; the
 	echo "Error: Mandatory options --project, --build-id or --workdir missing." >&2
 	help
 fi
+cd "${WORKDIR}"
 
 # Read configuration from ${HOME}/.config/ci/containers.conf if available
 if [[ -z ${CONFIG} ]] || [[ ! -f ${CONFIG} ]]; then
@@ -142,8 +112,6 @@ if [[ -z ${REG_USER} ]] || [[ -z ${REG_ADDR} ]]; then
 	echo "Please edit the configuration file!"
 	exit 1
 fi
-
-cd "${WORKDIR}"
 
 if   [[ -z ${TAG} ]]; then
 	TAG="latest"
@@ -231,18 +199,20 @@ if [[ ! -f ${LOCKFILE}  ]]; then
 		done
 
 		# Sign and Upload image to the registry if requested
-		if [[ ${UPLOAD} == "true" ]]; then
+		if [[ ${UPLOAD} == "true" ]] || [[ ${UPLOAD} == "yes" ]]; then
 			push_args=(--authfile "${AUTHFILE}")
 
 			# Encrypt image if enabled
-			if [[ ${ENCRYPT} == true ]]; then
+			if [[ ${ENCRYPT} == "true" ]] || [[ ${ENCRYPT} == "yes" ]]; then
 				push_args+=(--encryption-key="${ENCRYPT_KEY}")
 			fi
 
 			# Images are only signed if private key and password file are set.
 			# If they are not set or the file does not exist, then the image
 			# will be pushed unsigned.
-			if [[ ${SIGN} == "true" ]] && [[ -f ${SIGN_PRIVATE_KEY} ]] &&
+			if [[ ${SIGN} == "true" ]] ||
+				[[ ${SIGN} == "yes" ]] &&
+				[[ -f ${SIGN_PRIVATE_KEY} ]] &&
 				[[ -f ${SIGN_PASSWORD_FILE} ]]; then
 				push_args+=(
 					--sign-by-sigstore-private-key "${SIGN_PRIVATE_KEY}"
@@ -273,7 +243,7 @@ if [[ ! -f ${LOCKFILE}  ]]; then
 				podman_args+=(--from docker.io/dirk1980/fedora-riscv64:latest)
 			fi
 
-			if [[ ${ADD_KEYS} == true ]]; then
+			if [[ ${ADD_KEYS} == "true" ]] || [[ ${ADD_KEYS} == "yes" ]]; then
 				podman_args+=(--build-arg sshkeys="$(cat "${SSH_KEYFILE}")")
 			fi
 
@@ -298,7 +268,7 @@ if [[ ! -f ${LOCKFILE}  ]]; then
 			fi
 
 			# Sign and Upload image to the registry if requested
-			if [[ ${UPLOAD} == "true" ]]; then
+			if [[ ${UPLOAD} == "true" ]] || [[ ${UPLOAD} == "yes" ]]; then
 				push_args=()
 
 				# Encrypt image if enabled
@@ -309,7 +279,9 @@ if [[ ! -f ${LOCKFILE}  ]]; then
 				# Images are only signed if private key and password file are set.
 				# If they are not set or the file does not exist, then the image
 				# will be pushed unsigned.
-				if [[ ${SIGN} == "true" ]] && [[ -f ${SIGN_PRIVATE_KEY} ]] &&
+				if [[ ${SIGN} == "true" ]] ||
+					[[ ${SIGN} == "yes" ]] &&
+					[[ -f ${SIGN_PRIVATE_KEY} ]] &&
 					[[ -f ${SIGN_PASSWORD_FILE} ]]; then
 					push_args+=(
 						--sign-by-sigstore-private-key "${SIGN_PRIVATE_KEY}"

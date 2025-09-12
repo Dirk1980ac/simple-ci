@@ -18,6 +18,15 @@ WORKDIR="${HOME}/.ci/build/${PROJECT}" # Working directory
 GIT_DIR="${HOME}/repos/${PROJECT}.git" # .git directory
 TAG="" # Initialize to avoid unbound variable
 
+# Set options for build script
+script_params+=(
+	--project="${PROJECT}"
+	--workdir="${WORKDIR}"
+	--build-id="${BUILD_ID}"
+	--upload
+	-c "${CFGFILE}"
+)
+
 # shellcheck disable=SC2034
 while read -r oldrev newrev ref; do
 	# Check if script is available and executable
@@ -31,67 +40,48 @@ while read -r oldrev newrev ref; do
 	# Clone git dir in workdir.
 	git clone --branch "${BRANCH}" "${GIT_DIR}" "${WORKDIR}"
 	cd "${WORKDIR}"
-
-	if [[ -f ${WORKDIR}/.simple-ci/${BRANCH}/podman.conf ]]; then
-		SCRIPT="${HOME}/.ci/podman/build-podman" # Build script
+	CFGFILE="${WORKDIR}/.simple-ci/${BRANCH}.conf"
+	if [[ -f ${CFGFILE} ]]; then
 		# shellcheck source=/dev/null
-		source "${WORKDIR}/.simple-ci/${BRANCH}/podman.conf"
+		source "${WORKDIR}/.simple-ci/${BRANCH}.conf"
+		if [[ ${PIPELINE} == "podman" ]]; then
 
-		if [[ ! -x ${SCRIPT} ]]; then
-			# Report missing build script
-			echo "Builder script missing."
-			exit 1
-		fi
+			SCRIPT="${HOME}/.ci/scripts/build-podsman" # Build script
+			if [[ ! -x ${SCRIPT} ]]; then
+				# Report missing build script
+				echo "Builder script missing."
+				exit 1
+			fi
 
-		if [[ -z ${TAG} ]]; then
-			TAG="latest"
-		fi
-		if [[ ! -d ${HOME}/.ci/build/locks ]]; then
-			mkdir -p "${HOME}/.ci/build/locks"
-		fi
+			if [[ -z ${TAG} ]]; then
+				TAG="latest"
+			fi
+			if [[ ! -d ${HOME}/.ci/build/locks ]]; then
+				mkdir -p "${HOME}/.ci/build/locks"
+			fi
 
-		LOCK_BUILD="${HOME}/.ci/build/locks/.${PROJECT}-${TAG}-running"
-		LOG_FILE="${HOME}/.ci/build/logs/${PROJECT}-${TAG}-${BUILD_ID}.log" # Log Filename
+			LOCK_BUILD="${HOME}/.ci/build/locks/.${PROJECT}-${TAG}-running"
+			LOG_FILE="${HOME}/.ci/build/logs/${PROJECT}-${TAG}-${BUILD_ID}.log" # Log Filename
 
-		if [[ ${#ARCHES[@]} -gt 0 ]]; then
-			for arch in "${ARCHES[@]}"; do
-				script_params+=(--arch "${arch}")
-			done
-		fi
+			if [[ ! -f ${LOCK_BUILD} ]]; then
+				# Report a started build
+				echo "${BRANCH} received. Building image."
 
-		if [[ ${ENCRYPT} == "true" ]]; then
-			script_params+=(--encrypt)
-		fi
-
-		if [[ ${SIGN} == "true" ]]; then
-			script_params+=(--sign)
-		fi
-
-		if [[ ${EMBED_KEYS} == "true" ]]; then
-			script_params+=(--add-ssh-keys)
-		fi
-
-		# Set options for build script
-		script_params=(
-			--project="${PROJECT}"
-			--workdir="${WORKDIR}"
-			--build-id="${BUILD_ID}"
-			--upload
-			-c "${WORKDIR}/.simple-ci/${BRANCH}/podman.conf"
-		)
-
-		if [[ ! -f ${LOCK_BUILD} ]]; then
-			# Report a started build
-			echo "${BRANCH} received. Building image."
-
-			# Start build script in a subshell
+				# Start build script in a subshell
+				(setsid bash "${SCRIPT}" "${script_params[@]}" < /dev/null \
+					&> "${LOG_FILE}" &) &
+			else
+				# Report already running build if lock exists.
+				echo "Build is already running. Ignoring request."
+			fi
+		elif [[ ${PIPELINE} == "generic" ]]; then
+			SCRIPT="${HOME}/.ci/scripts/build-generic" # Build script
+			# TODO: Implement generic builds here.
 			(setsid bash "${SCRIPT}" "${script_params[@]}" < /dev/null \
 				&> "${LOG_FILE}" &) &
+			exit 1
 		else
-			# Report already running build if lock exists.
-			echo "Build is already running. Ignoring request."
+			rm -rf "${WORKDIR}"
 		fi
-	else # TODO: Implement other Builds as elif here.
-		rm -rf "${WORKDIR}"
 	fi
 done
