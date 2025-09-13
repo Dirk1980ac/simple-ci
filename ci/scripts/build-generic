@@ -12,6 +12,8 @@ WORKDIR=""
 ARCHES=()
 CONFIG=""
 RUN_HOST=""
+OUTPUT_DIR=""
+OUTPUT_MOUNT=""
 
 # Print a hopefully useful help text.
 help() {
@@ -134,11 +136,22 @@ if [[ ! -f ${LOCKFILE}  ]]; then
 			--arch "${arch}"
 			--security-opt label=type:unconfined_t
 			-v "${WORKDIR}:/workdir"
-			-v "${OUTPUT_DIR}:/root/rpmbuild"
-			"${RUNNER}"
-			"${BUILDSCRIPT}"
-			"${SCRIPT_ARGS}"
 		)
+
+		if [[ -n ${OUTPUT_DIR} ]] && [[ -n ${OUTPUT_MOUNT} ]]; then
+			podman_args+=(-v "${HOME}/${OUTPUT_DIR}:${OUTPUT_MOUNT}")
+		fi
+
+		podman_args+=(
+			"${RUNNER}"
+		)
+
+		if [[ -n ${BUILDSCRIPT} ]]; then
+			podman_args+=(
+				"${BUILDSCRIPT}"
+				"${SCRIPT_ARGS}"
+			)
+		fi
 
 		timeout 2h podman run "${podman_args[@]}"
 	done
