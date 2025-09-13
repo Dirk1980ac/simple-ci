@@ -74,7 +74,7 @@ while read -r oldrev newrev ref; do
 
 			if [[ ! -f ${LOCK_BUILD} ]]; then
 				# Report a started build
-				echo "Build starting fir '${TAG}'."
+				echo "Build starting for '${TAG}'."
 
 				# Start build script in a subshell
 				(setsid bash "${SCRIPT}" "${script_params[@]}" < /dev/null \
