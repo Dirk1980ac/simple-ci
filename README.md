@@ -14,8 +14,9 @@ This CI is entirely written as bash. All builds run in podman containers so
 allowing own build scripts for the 'generic' pipeline are no security risk in my
 opinion.
 
-The runtime for a build is limited to 2 hours for now, then a still tunning
-container will be killed to avoid hanging workflow containers hanging around.
+The runtime for a build is limited to 2 hours and the moory limit is 1GB for
+now, then a still tunning container will be killed to avoid hanging workflow
+containers hanging around.
 
 **NOTE: You must have enabled lingering for the user which uses this ci.**
 
