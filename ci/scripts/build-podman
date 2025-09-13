@@ -17,6 +17,7 @@ ADD_KEYS="false"
 CONFIG=""
 ENCRYPT="false"
 RUN_HOST=""
+CONTAINERFILE=""
 
 # Print a hopefully useful help text.
 help() {
@@ -169,6 +170,10 @@ if [[ ! -f ${LOCKFILE}  ]]; then
 				podman_args+=(--from docker.io/dirk1980/fedora-riscv64:latest)
 			fi
 
+			if [[ -n ${CONTAINERFILE} ]]; then
+				podman_args+=(-f "${CONTAINERFILE}")
+			fi
+
 			podman_args+=(
 				--rm
 				--arch "${arch}"
@@ -242,6 +247,10 @@ if [[ ! -f ${LOCKFILE}  ]]; then
 			# Use our own base image if we are building a ricv64 image
 			if [[ ${arch} == "riscv64" ]]; then
 				podman_args+=(--from docker.io/dirk1980/fedora-riscv64:latest)
+			fi
+
+			if [[ -n ${CONTAINERFILE} ]]; then
+				podman_args+=(-f "${CONTAINERFILE}")
 			fi
 
 			if [[ ${ADD_KEYS} == "true" ]] || [[ ${ADD_KEYS} == "yes" ]]; then
