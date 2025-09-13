@@ -251,6 +251,7 @@ if [[ ! -f ${LOCKFILE}  ]]; then
 			podman_args+=(
 				--arch "${arch}"
 				--rm
+				--memory 1g
 				--build-arg buildid="${BUILD_ID}"
 				--security-opt label=type:unconfined_t
 				--pull=always

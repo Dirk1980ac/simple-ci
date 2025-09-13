@@ -129,6 +129,7 @@ if [[ ! -f ${LOCKFILE}  ]]; then
 
 		podman_args+=(
 			--rm
+			--memory 1g
 			--pull=always
 			--arch "${arch}"
 			--security-opt label=type:unconfined_t
