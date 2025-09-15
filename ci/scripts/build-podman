@@ -109,9 +109,9 @@ else
 	source "${CONFIG}"
 fi
 
-if [[ -z ${REG_USER} ]] || [[ -z ${REG_ADDR} ]]; then
-	echo "Please edit the configuration file!"
-	exit 1
+if [[ ${UPLOAD} == "true" ]] && [[ -z ${REG_USER} ]] || [[ -z ${REG_ADDR} ]]; then
+	echo "UPLOAD is true but no target is specified, disabling Upload."
+	UPLOAD="false"
 fi
 
 if   [[ -z ${TAG} ]]; then
