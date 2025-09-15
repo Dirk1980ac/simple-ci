@@ -4,7 +4,9 @@
 
 set -eu
 
-PROJECT="" # Project name
+GIT_DIR=$(pwd) # Git repo directory
+REPONAME=$(basename "${GIT_DIR}") # Repository directory name
+PROJECT="${REPONAME%.git}" # Project name
 
 # Generate BUILD_ID
 BUILD_ID="$(date -u +%Y%m%d.%H%M)"
@@ -14,25 +16,33 @@ if    [[ -z ${PROJECT} ]]; then
 	exit 1
 fi
 
-WORKDIR="${HOME}/.ci/build/${PROJECT}" # Working directory
-GIT_DIR="${HOME}/repos/${PROJECT}.git" # .git directory
-TAG="" # Initialize to avoid unbound variable
+# Working directory for the build
+WORKDIR="${HOME}/.ci/build/${PROJECT}"
+
+# Initialize ${TAG} to avoid unbound variable ig not set in config file.
+TAG=""
+
+# CI log directory
 LOG_DIR="${HOME}/.ci/logs"
+
+# Lock directory to avoid concurrent Builds oh the same image
 LOCK_DIR="${HOME}/.ci/lock"
 
+# Check if log directory is available, otherwise create ist
 if [[ ! -d ${LOG_DIR} ]]; then
 	mkdir -p "${LOG_DIR}"
 fi
+
+# Check if lock directory is available, otherwise create ist
 if [[ ! -d ${LOCK_DIR} ]]; then
 	mkdir -p "${LOCK_DIR}"
 fi
 
 # shellcheck disable=SC2034
 while read -r oldrev newrev ref; do
-	# Check if script is available and executable
-
 	BRANCH=${ref##refs/heads/}
 
+	# Check if Working directory is available, otherwise create ist
 	if [[ -d ${WORKDIR} ]]; then
 		rm -rf "${WORKDIR}"
 	fi

@@ -181,7 +181,8 @@ if [[ ! -f ${LOCKFILE}  ]]; then
 				--security-opt label=type:unconfined_t
 				--pull=always
 				--network host
-				-t "${REG_ADDR}/${REG_USER}/${PROJECT}:${TAG}-${arch}" "${WORKDIR}"
+				-t "${REG_ADDR}/${REG_USER}/${PROJECT}:${TAG}-${arch}"
+				"${WORKDIR}"
 			)
 
 			# Run the build
@@ -287,9 +288,9 @@ if [[ ! -f ${LOCKFILE}  ]]; then
 					push_args+=(--encryption-key="${ENCRYPT_KEY}")
 				fi
 
-				# Images are only signed if private key and password file are set.
-				# If they are not set or the file does not exist, then the image
-				# will be pushed unsigned.
+				# Images are only signed if private key and password file are
+				# set. If they are not set or the file does not exist, then the
+				# image will be pushed unsigned.
 				if [[ ${SIGN} == "true" ]] ||
 					[[ ${SIGN} == "yes" ]] &&
 					[[ -f ${SIGN_PRIVATE_KEY} ]] &&
