@@ -63,9 +63,10 @@ while read -r oldrev newrev ref; do
 	if [[ -f ${CFGFILE} ]]; then
 		# shellcheck source=/dev/null
 		source "${WORKDIR}/.simple-ci/${BRANCH}.conf"
-		if [[ ${PIPELINE} == "podman" ]]; then
+		if [[ ${PIPELINE} == "podman" ]] || [[ ${PIPELINE} == "docker" ]]; then
 
 			SCRIPT="${HOME}/.ci/scripts/build-podman" # Build script
+
 			if [[ ! -x ${SCRIPT} ]]; then
 				# Report missing build script
 				echo "Builder script missing."
@@ -75,6 +76,7 @@ while read -r oldrev newrev ref; do
 			if [[ -z ${TAG} ]]; then
 				TAG="latest"
 			fi
+
 			if [[ ! -d ${HOME}/.ci/build/locks ]]; then
 				mkdir -p "${HOME}/.ci/build/locks"
 			fi

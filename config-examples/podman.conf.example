@@ -1,6 +1,9 @@
 # Simple-ci build configuration file
 
-# Pipeline to use (actually supported are 'podman' and 'generic')
+
+# Pipeline to use.
+# To build a OCI container image use 'podman' or 'docker' which are synonymous.
+# If you want to use the generic pipeline use "generic".
 PIPELINE="podman"
 
 # Tagh to build
