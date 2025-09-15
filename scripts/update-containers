@@ -7,12 +7,37 @@ set -eu
 # Which PROJECTS should be built?
 PROJECTS=()
 
+# Branch to use for automatic update build
+BRANCH="master"
+AUTOUPDATE_DIR="${HOME}/auto-updates"
+REPODIR="${HOME}/repos/"
+
+if [[ ! -d ~/auto-updates/ ]]; then
+	mkdir -p "${AUTOUPDATE_DIR}"
+fi
+
 for project in "${PROJECTS[@]}"; do
-	if [[ -f ${HOME}/.ci/build/${project}/.simple-ci/master.conf ]]; then
+	git clone --branch "${BRANCH}" "${REPODIR}/${project}.git" "${AUTOUPDATE_DIR}/${project}"
+
+	if [[ -f ${AUTOUPDATE_DIR}/${project}/.simple-ci/master.conf ]]; then
 		buildid=$(date -u +%Y%m%d.%H%M)
-		"${HOME}"/.ci/podman/build-podman -p "${project}" \
-			-w "${HOME}/.ci/build/${project}" \
-			-b "${buildid}" \
-			-c "${HOME}/.ci/build/${project}/.simple-ci/master.conf"
+
+		# shellcheck source=/dev/null
+		source "${AUTOUPDATE_DIR}/${project}/.simple-ci/master.conf"
+
+		if [[ ${PIPELINE} == "podman" ]]; then
+			"${HOME}"/.ci/scripts/build-podman -p "${project}" \
+				-w "${AUTOUPDATE_DIR}/${project}" \
+				-b "${buildid}" \
+				-c "${AUTOUPDATE_DIR}/${project}/.simple-ci/master.conf"
+		elif [[ ${PIPELINE} == "generic" ]]; then
+			"${HOME}"/.ci/scripts/build-generic -p "${project}" \
+				-w "${AUTOUPDATE_DIR}/${project}" \
+				-b "${buildid}" \
+				-c "${AUTOUPDATE_DIR}/${project}/.simple-ci/master.conf"
+		fi
+	else
+		echo "WARNING: No ${BRANCH}.conf found in project ${project}."
 	fi
+	rm -rf "${AUTOUPDATE_DIR:?}/${project}"
 done
