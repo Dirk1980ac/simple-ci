@@ -15,7 +15,7 @@ ARCHES=() # Architectures to build ("arch1" "arch2" ...)
 ## Image encryption
 # Encrypt the image (must be supported by registry)
 ENCRYPT="false" # Encrypt the image before pushing it to the server
-ä Key fir encryption
+# Key for encryption
 ENCRYPT_KEY=""
 
 ## Image sicgnature

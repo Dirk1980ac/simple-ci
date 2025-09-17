@@ -16,14 +16,9 @@ if    [[ -z ${PROJECT} ]]; then
 	exit 1
 fi
 
-# Working directory for the build
-WORKDIR="${HOME}/.ci/build/${PROJECT}"
-
-# Initialize ${TAG} to avoid unbound variable ig not set in config file.
-TAG=""
-
 # CI log directory
 LOG_DIR="${HOME}/.ci/logs"
+LOG_FILE="${LOG_DIR}/${PROJECT}-${BUILD_ID}.log" # Log Filename
 
 # Lock directory to avoid concurrent Builds oh the same image
 LOCK_DIR="${HOME}/.ci/lock"
@@ -41,6 +36,8 @@ fi
 # shellcheck disable=SC2034
 while read -r oldrev newrev ref; do
 	BRANCH=${ref##refs/heads/}
+	# Working directory for the build
+	WORKDIR="${HOME}/.ci/build/${PROJECT}-${BRANCH}"
 
 	# Check if Working directory is available, otherwise create ist
 	if [[ -d ${WORKDIR} ]]; then
@@ -49,7 +46,6 @@ while read -r oldrev newrev ref; do
 
 	# Clone git dir in workdir.
 	git clone --branch "${BRANCH}" "${GIT_DIR}" "${WORKDIR}"
-	cd "${WORKDIR}"
 	CFGFILE="${WORKDIR}/.simple-ci/${BRANCH}.conf"
 
 	# Set options for build script
@@ -63,54 +59,18 @@ while read -r oldrev newrev ref; do
 	if [[ -f ${CFGFILE} ]]; then
 		# shellcheck source=/dev/null
 		source "${WORKDIR}/.simple-ci/${BRANCH}.conf"
-		if [[ ${PIPELINE} == "podman" ]] || [[ ${PIPELINE} == "docker" ]]; then
+		SCRIPT="${HOME}/.ci/scripts/ci-build" # Build script
 
-			SCRIPT="${HOME}/.ci/scripts/build-podman" # Build script
-
-			if [[ ! -x ${SCRIPT} ]]; then
-				# Report missing build script
-				echo "Builder script missing."
-				exit 1
-			fi
-
-			if [[ -z ${TAG} ]]; then
-				TAG="latest"
-			fi
-
-			if [[ ! -d ${HOME}/.ci/build/locks ]]; then
-				mkdir -p "${HOME}/.ci/build/locks"
-			fi
-
-			LOCK_BUILD="${LOCK_DIR}/.${PROJECT}-${TAG}-running"
-			LOG_FILE="${LOG_DIR}/${PROJECT}-${TAG}-${BUILD_ID}.log" # Log Filename
-
-			if [[ ! -f ${LOCK_BUILD} ]]; then
-				# Report a started build
-				echo "Build starting for '${TAG}'."
-
-				# Start build script in a subshell
-				(setsid bash "${SCRIPT}" "${script_params[@]}" < /dev/null \
-					&> "${LOG_FILE}" &) &
-			else
-				# Report already running build if lock exists.
-				echo "Build is already running. Ignoring request."
-			fi
-		elif [[ ${PIPELINE} == "generic" ]]; then
-			SCRIPT="${HOME}/.ci/scripts/build-generic" # Build script
-			LOCK_BUILD="${LOCK_DIR}/.${PROJECT}-running"
-			LOG_FILE="${LOG_DIR}/${PROJECT}-${BUILD_ID}.log" # Log Filename
-
-			if [[ ! -f ${LOCK_BUILD} ]]; then
-				echo "Starting generic Build."
-				(setsid bash "${SCRIPT}" "${script_params[@]}" < /dev/null \
-					&> "${LOG_FILE}" &) &
-				exit 1
-			else
-				# Report already running build if lock exists.
-				echo "Build is already running. Ignoring request."
-			fi
-		else
-			rm -rf "${WORKDIR}"
+		if [[ ! -x ${SCRIPT} ]]; then
+			# Report missing build script
+			echo "Builder script missing."
+			exit 1
 		fi
+
+		# Start build script in a subshell
+		(setsid bash "${SCRIPT}" "${script_params[@]}" < /dev/null &> "${LOG_FILE}" &) &
+	else
+		# If no config gile is found just delete the working directory.
+		rm -rf "${WORKDIR}"
 	fi
 done
