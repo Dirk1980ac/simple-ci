@@ -11,9 +11,13 @@ PROJECT=""
 WORKDIR=""
 BUILD_ID=""
 CONFIG=""
+
+# Add new variables and initialize them to avoid "unbound variable" for older
+# configurations and be backwards compatible.
 BRANCH=""
 CONTAINERFILE=""
 SQUASH=""
+DISABLE_CACHE=""
 
 help() {
 	cat << EOF
@@ -172,6 +176,11 @@ case "${PIPELINE}" in
 
 					if [[ ${SQUASH} == "true" ]] || [[ ${SQUASH} == "yes" ]]; then
 						podman_args+=(--squash-all)
+					fi
+
+					if [[ ${DISABLE_CACHE} == "true" ]] ||
+						[[ ${DISABLE_CACHE} == "yes" ]]; then
+						podman_args+=(--no-cache)
 					fi
 
 					podman_args+=(
