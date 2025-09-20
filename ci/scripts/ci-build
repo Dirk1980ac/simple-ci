@@ -11,7 +11,9 @@ PROJECT=""
 WORKDIR=""
 BUILD_ID=""
 CONFIG=""
+BRANCH=""
 CONTAINERFILE=""
+SQUASH=""
 
 help() {
 	cat << EOF
@@ -28,9 +30,11 @@ Options:
   -w <directory>, --workdir=<directory>
       Specifies the **working directory** where the build context is located.
       This option is **mandatory**.
-  -b <id>, --build-id=<id>
+  --build-id=<id>
       Assigns a **build ID** to the image, which can be used for versioning or tracking.
       This option is **mandatory**.
+  --branch
+      Branch which is being built.
   -h, --help
       Displays this help message and exits.
 
@@ -41,7 +45,7 @@ EOF
 }
 
 # Parse command line options
-if ! ARGS=$(getopt -o p:w:b:hc: --long project:,workdir:,build-id:,help,config: -n "$(basename "$0")" -- "$@"); then
+if ! ARGS=$(getopt -o p:w:hc: --long project:,workdir:,build-id:,branch:,help,config: -n "$(basename "$0")" -- "$@"); then
 	echo "Error: Failed to parse options. Please check your command." >&2
 	help
 fi
@@ -58,8 +62,12 @@ while true; do
 			WORKDIR=$2
 			shift 2
 			;;
-		-b | --build-id)
+		--build-id)
 			BUILD_ID=$2
+			shift 2
+			;;
+		--branch)
+			BRANCH=$2
 			shift 2
 			;;
 		-h | --help)
@@ -125,9 +133,9 @@ case "${PIPELINE}" in
 			fi
 
 			if [[ ${#ARCHES[@]} -gt 1 ]]; then
-				podman manifest exists "${REG_ADDR}/${REG_USER}/${PROJECT}:${TAG}" &&
-					podman manifest rm "${REG_ADDR}/${REG_USER}/${PROJECT}:${TAG}"
-				podman manifest create "${REG_ADDR}/${REG_USER}/${PROJECT}:${TAG}"
+				podman manifest exists "${PROJECT}:${TAG}" &&
+					podman manifest rm "${PROJECT}:${TAG}"
+				podman manifest create "${PROJECT}:${TAG}"
 
 				for arch in "${ARCHES[@]}"; do
 					RUN_HOST=""
@@ -162,6 +170,10 @@ case "${PIPELINE}" in
 						podman_args+=(-f "${CONTAINERFILE}")
 					fi
 
+					if [[ ${SQUASH} == "true" ]]; then
+						podman_args+=(--squash-all)
+					fi
+
 					podman_args+=(
 						--rm
 						--arch "${arch}"
@@ -169,25 +181,25 @@ case "${PIPELINE}" in
 						--security-opt label=type:unconfined_t
 						--pull=always
 						--network host
-						-t "${REG_ADDR}/${REG_USER}/${PROJECT}:${TAG}-${arch}"
+						-t "${PROJECT}:${TAG}-${arch}"
 						"${WORKDIR}"
 					)
 					podman build "${podman_args[@]}"
 
 					if [[ -n ${RUN_HOST} ]]; then
 						podman image scp \
-							"${RUN_HOST}::${REG_ADDR}/${REG_USER}/${PROJECT}:${TAG}-${arch}" \
+							"${RUN_HOST}::${PROJECT}:${TAG}-${arch}" \
 							localhost::
 					fi
 
 					podman manifest add \
-						"${REG_ADDR}/${REG_USER}/${PROJECT}:${TAG}" \
-						"${REG_ADDR}/${REG_USER}/${PROJECT}:${TAG}-${arch}"
+						"${PROJECT}:${TAG}" \
+						"${PROJECT}:${TAG}-${arch}"
 				done
 
 				for arch in "${ARCHES[@]}"; do
 					podman image untag \
-						"${REG_ADDR}/${REG_USER}/${PROJECT}:${TAG}-${arch}"
+						"${PROJECT}:${TAG}-${arch}"
 				done
 
 				if [[ ${UPLOAD} == "true" ]] || [[ ${UPLOAD} == "yes" ]]; then
@@ -202,6 +214,7 @@ case "${PIPELINE}" in
 							--sign-by-sigstore-private-key "${SIGN_PRIVATE_KEY}"
 							--sign-passphrase-file "${SIGN_PASSWORD_FILE}")
 					fi
+					push_args+=("${PROJECT}:${TAG}")
 					push_args+=("${REG_ADDR}/${REG_USER}/${PROJECT}:${TAG}")
 					podman manifest push "${push_args[@]}"
 				fi
@@ -232,6 +245,10 @@ case "${PIPELINE}" in
 						podman_args+=(-f "${CONTAINERFILE}")
 					fi
 
+					if [[ ${SQUASH} == "true" ]]; then
+						podman_args+=(--squash-all)
+					fi
+
 					if [[ ${EMBED_KEYS} == "true" ]] ||
 						[[ ${EMBED_KEYS} == "yes" ]]; then
 						podman_args+=(--build-arg sshkeys="$(cat "${SSH_KEYFILE}")")
@@ -245,14 +262,17 @@ case "${PIPELINE}" in
 						--security-opt label=type:unconfined_t
 						--pull=always
 						--network host
-						-t "${REG_ADDR}/${REG_USER}/${PROJECT}:${TAG}" "${WORKDIR}"
+						-t "${PROJECT}:${TAG}" "${WORKDIR}"
 					)
+
+					podman image exists "${REG_ADDR}/${REG_USER}/${PROJECT}:${TAG}" &&
+						podman image rm "${REG_ADDR}/${REG_USER}/${PROJECT}:${TAG}" --force
 
 					podman build "${podman_args[@]}"
 
 					if [[ -n ${RUN_HOST} ]]; then
 						podman image scp \
-							"${RUN_HOST}::${REG_ADDR}/${REG_USER}/${PROJECT}:${TAG}" \
+							"${RUN_HOST}::${PROJECT}:${TAG}" \
 							localhost::
 					fi
 
@@ -272,6 +292,7 @@ case "${PIPELINE}" in
 
 						push_args+=(
 							--authfile "${AUTHFILE}"
+							"${PROJECT}:${TAG}"
 							"${REG_ADDR}/${REG_USER}/${PROJECT}:${TAG}"
 						)
 						podman push "${push_args[@]}"

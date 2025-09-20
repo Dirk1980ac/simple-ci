@@ -50,9 +50,10 @@ while read -r oldrev newrev ref; do
 
 	# Set options for build script
 	script_params+=(
-		--project="${PROJECT}"
-		--workdir="${WORKDIR}"
-		--build-id="${BUILD_ID}"
+		--project "${PROJECT}"
+		--workdir "${WORKDIR}"
+		--build-id "${BUILD_ID}"
+		--branch "${BRANCH}"
 		--config "${CFGFILE}"
 	)
 
