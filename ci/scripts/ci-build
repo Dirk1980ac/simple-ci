@@ -170,7 +170,7 @@ case "${PIPELINE}" in
 						podman_args+=(-f "${CONTAINERFILE}")
 					fi
 
-					if [[ ${SQUASH} == "true" ]]; then
+					if [[ ${SQUASH} == "true" ]] || [[ ${SQUASH} == "yes" ]]; then
 						podman_args+=(--squash-all)
 					fi
 
