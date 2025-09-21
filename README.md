@@ -1,6 +1,6 @@
 # simple-ci
 
-This is a small CI sytem for git repos.  
+This is a small CI sytem for git repos.
 
 ## Details
 
@@ -16,7 +16,8 @@ opinion.
 
 The runtime for a build is limited to 2 hours and the moory limit is 1GB for
 now, then a still tunning container will be killed to avoid hanging workflow
-containers hanging around.
+containers hanging around. You may change the timeout if you need to in the
+ci-build script.
 
 **NOTE: You must have enabled lingering for the user which uses this ci.**
 
@@ -28,6 +29,11 @@ sudo loginctl enable-linger <USER>
 
 On the host where the CI is installed you need to have at least podman installed
 and running and you have to enable linger for the running user.
+
+## Trigger
+
+Put an apropriate config file (see examples) in .simple-ci and name it after the
+branch you want to build. (e.g. master.conf).
 
 ## Features
 
@@ -42,28 +48,12 @@ and running and you have to enable linger for the running user.
   rely on external software for itself.
 - Configurable remote host as a runner for a specific architecture. (Corrently
   out of the box supported are arm64, amd64 and riscv64)
-
-## Trigger
-
-Put an apropriate config file (see examples) in .simple-ci and name with the
-branch you want to build as it`s name (e.g. master.conf).
-
-## TODO (planned)
-
-- [x] Support container builds on a podman remote host as runner for e.g. a
-specific architecture.
-
-- [x] Support git-crypt encrypted files in repositories.
-
-- [x] Support build configurations using a custom configuration file.
-
-- [x] Log the build process.
-
-- [x] Support in-repo configuration.
-
-- [x] Supports generic builds inside a container.
-
-- [ ] Automatic tests of built container images.
-
-- [ ] Implement some (semi) automatic versioning scheme and system, especially
-for BootC Projects.
+- Supports generic builds with custom build scripts which securely run in a
+  container.
+- Supports git-crypt encrypted repositories. (For CI credentials for example.)
+- Support container builds on a podman remote host as runner for e.g. a
+  specific architecture.
+- Supports git-crypt encrypted files in repositories.
+- Logs the build process.
+- Support in-repo configuration.
+- Supports generic builds (inside a container).
