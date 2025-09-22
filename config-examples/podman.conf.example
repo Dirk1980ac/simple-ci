@@ -37,6 +37,9 @@ SSH_KEYFILE=""
 # Containerfile to use if nor Containerfile or Dockerfile
 CONTAINERFILE=""
 
+# Additional Build Arguments
+BUILD_ARGS=()
+
 # Repostory namespace (usually the username - used to generate the image path)
 REG_USER=""
 

@@ -11,6 +11,7 @@ PROJECT=""
 WORKDIR=""
 BUILD_ID=""
 CONFIG=""
+BUILD_ARGS=()
 
 # Add new variables and initialize them to avoid "unbound variable" for older
 # configurations and be backwards compatible.
@@ -160,6 +161,10 @@ case "${PIPELINE}" in
 						)
 					fi
 
+					for arg in "${BUILD_ARGS[@]}"; do
+						podman_args+=(--build-arg "${arg}")
+					done
+
 					if [[ -n ${RUN_HOST} ]]; then
 						podman_args+=(-c "${RUN_HOST}")
 					fi
@@ -266,7 +271,6 @@ case "${PIPELINE}" in
 					podman_args+=(
 						--arch "${arch}"
 						--rm
-						--memory 1g
 						--build-arg buildid="${BUILD_ID}"
 						--security-opt label=type:unconfined_t
 						--pull=always
