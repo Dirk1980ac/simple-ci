@@ -57,3 +57,12 @@ branch you want to build. (e.g. master.conf).
 - Logs the build process.
 - Support in-repo configuration.
 - Supports generic builds (inside a container).
+
+## Limitations
+
+- The git-hook does not wprk in radicle repositories, but the build script and
+  the configurazion file can be used with radicle-native-ci to run all builds in
+  a podman container.
+
+- There is no scheduling right now. The build starts right after the commit is
+  received, except the build is locked because of another concurrent run.

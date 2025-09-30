@@ -5,7 +5,8 @@
 set -eu
 
 # Which PROJECTS should be built?
-PROJECTS=()
+PROJECTS=(
+)
 
 # Branch to use for automatic update build
 BRANCH="master"
@@ -17,27 +18,73 @@ if [[ ! -d ~/auto-updates/ ]]; then
 fi
 
 for project in "${PROJECTS[@]}"; do
-	git clone --branch "${BRANCH}" "${REPODIR}/${project}.git" "${AUTOUPDATE_DIR}/${project}"
+	WORKDIR="${AUTOUPDATE_DIR}/${project}-${BRANCH}"
 
-	if [[ -f ${AUTOUPDATE_DIR}/${project}/.simple-ci/master.conf ]]; then
+	if [[ -d ${WORKDIR} ]]; then
+		rm -rf "${WORKDIR:?}"
+	fi
+
+	git clone --branch "${BRANCH}" "${REPODIR}/${project}.git" "${WORKDIR}"
+	cd "${WORKDIR}"
+
+	if [[ -d .git-crypt ]]; then
+		git --git-dir .git --work-tree . crypt unlock
+	fi
+
+	if [[ -f ${WORKDIR}/.simple-ci/${BRANCH}.conf ]]; then
 		buildid=$(date -u +%Y%m%d.%H%M)
 
 		# shellcheck source=/dev/null
-		source "${AUTOUPDATE_DIR}/${project}/.simple-ci/master.conf"
+		source "${WORKDIR}/.simple-ci/${BRANCH}.conf"
 
-		if [[ ${PIPELINE} == "podman" ]]; then
-			"${HOME}"/.ci/scripts/build-podman -p "${project}" \
-				-w "${AUTOUPDATE_DIR}/${project}" \
-				-b "${buildid}" \
-				-c "${AUTOUPDATE_DIR}/${project}/.simple-ci/master.conf"
-		elif [[ ${PIPELINE} == "generic" ]]; then
-			"${HOME}"/.ci/scripts/build-generic -p "${project}" \
-				-w "${AUTOUPDATE_DIR}/${project}" \
-				-b "${buildid}" \
-				-c "${AUTOUPDATE_DIR}/${project}/.simple-ci/master.conf"
-		fi
+		"${HOME}"/.ci/scripts/ci-build -p "${project}" \
+			--workdir "${WORKDIR}" \
+			--build-id "${buildid}" \
+			--config "${WORKDIR}/.simple-ci/${BRANCH}.conf" \
+			--branch "${BRANCH}"
 	else
 		echo "WARNING: No ${BRANCH}.conf found in project ${project}."
 	fi
-	rm -rf "${AUTOUPDATE_DIR:?}/${project}"
+
+	if [[ -d .git-crypt ]]; then
+		git --git-dir .git --work-tree . crypt lock
+	fi
+
+	rm -rf "${WORKDIR:?}"
+done
+
+# Extra images for Raspberry Pi
+# Which PROJECTS should be built?
+PROJECTS=(
+)
+
+# Branch to use for automatic update build
+BRANCH="rpi"
+
+for project in "${PROJECTS[@]}"; do
+	WORKDIR="${AUTOUPDATE_DIR}/${project}-${BRANCH}"
+
+	if [[ -d ${WORKDIR} ]]; then
+		rm -f "${WORKDIR}"
+	fi
+
+	git clone --branch "${BRANCH}" "${REPODIR}/${project}.git" "${WORKDIR}"
+
+	cd "${WORKDIR}"
+
+	if [[ -f ${WORKDIR}/.simple-ci/${BRANCH}.conf ]]; then
+		buildid=$(date -u +%Y%m%d.%H%M)
+
+		# shellcheck source=/dev/null
+		source "${WORKDIR}/.simple-ci/${BRANCH}.conf"
+
+		"${HOME}"/.ci/scripts/ci-build -p "${project}" \
+			--workdir "${WORKDIR}" \
+			--build-id "${buildid}" \
+			--config "${WORKDIR}/.simple-ci/${BRANCH}.conf" \
+			--branch "${BRANCH}"
+	else
+		echo "WARNING: No ${BRANCH}.conf found in project ${project}."
+	fi
+	rm -rf "${WORKDIR:?}"
 done

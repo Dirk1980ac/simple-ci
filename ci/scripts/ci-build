@@ -7,18 +7,39 @@ set -eu
 
 # Initialize script variables because we use 'set -u' and set sane defaults.
 # These variables will be overridden by the config file.
+PIPELINE=""
 PROJECT=""
 WORKDIR=""
 BUILD_ID=""
 CONFIG=""
 BUILD_ARGS=()
-
-# Add new variables and initialize them to avoid "unbound variable" for older
-# configurations and be backwards compatible.
-BRANCH=""
+ARCHES=()
+AUTHFILE=""
+AMD64_REMOTE="" # x86_64 build host
+ARM64_REMOTE="" # aarch64 build host
+RISCV64_REMOTE="" # riscv64 build host
+BUILDSCRIPT=""
+SCRIPT_ARGS=""
+RUNNER=""
+OUTPUT_DIR=""
+OUTPUT_MOUNT=""
+UPLOAD="false"
+TAG="latest"
+ARCHES=() # Architectures to build ("arch1" "arch2" ...)
+SQUASH="false"
+DISABLE_CACHE="false"
+ENCRYPT="false" # Encrypt the image before pushing it to the server
+ENCRYPT_KEY=""
+SIGN="true" # Sign the image
+SIGN_PRIVATE_KEY="" # Private key for signing
+SIGN_PASSWORD_FILE="" # Key password file
+EMBED_KEYS="false"
+SSH_KEYFILE=""
 CONTAINERFILE=""
-SQUASH=""
-DISABLE_CACHE=""
+BUILD_ARGS=()
+REG_USER=""
+REG_ADDR=""
+BRANCH=""
 
 help() {
 	cat << EOF
@@ -355,6 +376,10 @@ case "${PIPELINE}" in
 
 				if [[ -n ${OUTPUT_DIR} ]] && [[ -n ${OUTPUT_MOUNT} ]]; then
 					podman_args+=(-v "${HOME}/${OUTPUT_DIR}:${OUTPUT_MOUNT}")
+				fi
+
+				if [[ -z ${RUNNER} ]]; then
+					RUNNER="docker.io/dirk1980/simple-ci-generic:latest"
 				fi
 
 				podman_args+=(

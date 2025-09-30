@@ -1,7 +1,5 @@
-# Simple-ci build configuration file
-
 # Pipeline to use.
-# To build a OCI container image use 'podman' or 'docker' which are synonymous,
+# To build a OCI container image use 'podman' or 'docker' which are synonymous.
 # If you want to use the generic pipeline use "generic"
 PIPELINE="generic"
 
@@ -18,14 +16,15 @@ ARM64_REMOTE="" # aarch64 build host
 RISCV64_REMOTE="" # riscv64 build host
 
 # Custom build script to run relative to project root (like ".simple-ci/script.sh")
+# If unset the build containers default entrypoint will be used.
 BUILDSCRIPT=""
 SCRIPT_ARGS=""
 
-# Build container to use for building.
+# Build container to use.
+# Default if unset: docker.io/dirk1980/simple-ci-generic:latest
 RUNNER="docker.io/dirk1980/simple-ci-generic:latest"
 
-ä# Mount an 'output' directory
-# Host directory relatove to ${HOME}
+# Mount an 'output' directory
+# Host directory relative to ${HOME}
 OUTPUT_DIR=""
-# Mount point inside build container
 OUTPUT_MOUNT=""

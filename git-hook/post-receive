@@ -20,7 +20,7 @@ fi
 LOG_DIR="${HOME}/.ci/logs"
 LOG_FILE="${LOG_DIR}/${PROJECT}-${BUILD_ID}.log" # Log Filename
 
-# Lock directory to avoid concurrent Builds oh the same image
+# Lock directory to avoid concurrent Builds of the same image
 LOCK_DIR="${HOME}/.ci/lock"
 
 # Check if log directory is available, otherwise create ist

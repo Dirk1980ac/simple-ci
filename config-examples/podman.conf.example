@@ -1,6 +1,3 @@
-# Simple-ci build configuration file
-
-
 # Pipeline to use.
 # To build a OCI container image use 'podman' or 'docker' which are synonymous.
 # If you want to use the generic pipeline use "generic".
@@ -12,7 +9,7 @@ TAG="latest"
 # Architectures to build for
 ARCHES=() # Architectures to build ("arch1" "arch2" ...)
 
-# Image layer suashing
+# Image layer squashing
 SQUASH="false"
 
 # Disable build cache?
@@ -31,22 +28,21 @@ SIGN_PASSWORD_FILE="" # Key password file
 
 ## Embedding root ssh keys
 EMBED_KEYS="false"
-# Root SSH key file to embed if requested
 SSH_KEYFILE=""
 
-# Containerfile to use if nor Containerfile or Dockerfile
+# Containerfile to use if not Containerfile or Dockerfile
 CONTAINERFILE=""
 
-# Additional Build Arguments
+# Additional Build Arguments (this is an array).
 BUILD_ARGS=()
 
-# Repostory namespace (usually the username - used to generate the image path)
+# Repostory namespace
 REG_USER=""
 
 # Registry address (only the domain name)
-REG_ADDR="" # Registry to use (Used to generate the image path)
+REG_ADDR=""
 
-# Registry credentials and signature settings
+# Registry credentials
 # Registry authentication token
 AUTHFILE=""
 
@@ -58,9 +54,6 @@ UPLOAD="true"
 # is not the same as the host.
 # The remotes have to be set up as system connections in Podman and use their
 # 'friendly' names here.
-# x86_64 build host
 AMD64_REMOTE=""
-# aarch64 build host
 ARM64_REMOTE=""
-# riscv64 build host
 RISCV64_REMOTE=""
