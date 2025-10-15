@@ -126,7 +126,7 @@ else
 	source "${CONFIG}"
 fi
 
-SIGN_PRIVATE_KEY="${HOME}/.config/simple-ci/secrets/${REG_USER}.key"
+SIGN_PRIVATE_KEY="${HOME}/.config/simple-ci/secrets/${REG_USER}.private"
 SIGN_PASSWORD_FILE="${HOME}/.config/simple-ci/secrets/${REG_USER}.pw"
 
 cleanup() {
