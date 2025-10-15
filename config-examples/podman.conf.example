@@ -23,8 +23,6 @@ ENCRYPT_KEY=""
 
 ## Image sicgnature
 SIGN="true" # Sign the image
-SIGN_PRIVATE_KEY="" # Private key for signing
-SIGN_PASSWORD_FILE="" # Key password file
 
 ## Embedding root ssh keys
 EMBED_KEYS="false"
@@ -41,10 +39,6 @@ REG_USER=""
 
 # Registry address (only the domain name)
 REG_ADDR=""
-
-# Registry credentials
-# Registry authentication token
-AUTHFILE=""
 
 # Push image to regiostry after Build
 UPLOAD="true"

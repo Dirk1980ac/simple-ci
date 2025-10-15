@@ -2,6 +2,8 @@
 
 This is a small CI sytem for git repos.
 
+**Credentials are no longer being read from the repository. Please update your projects and environment accodringly!**
+
 ## Details
 
 This CI consists of a git 'post-receive' hook, a worker script and a
@@ -28,7 +30,9 @@ sudo loginctl enable-linger <USER>
 ## Prerequissites
 
 On the host where the CI is installed you need to have at least podman installed
-and running and you have to enable linger for the running user.
+and running and you have to enable lingering for the running user.
+
+This CI uses podman specific features which may not be compatible with docker.
 
 ## Trigger
 
