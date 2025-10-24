@@ -24,10 +24,6 @@ ENCRYPT_KEY=""
 ## Image sicgnature
 SIGN="true" # Sign the image
 
-## Embedding root ssh keys
-EMBED_KEYS="false"
-SSH_KEYFILE=""
-
 # Containerfile to use if not Containerfile or Dockerfile
 CONTAINERFILE=""
 
@@ -51,3 +47,13 @@ UPLOAD="true"
 AMD64_REMOTE=""
 ARM64_REMOTE=""
 RISCV64_REMOTE=""
+
+### Only relevant for bootc images
+
+## Embedding root ssh keys
+EMBED_KEYS="false"
+SSH_KEYFILE=""
+
+# Sign Kernel and Bootloader
+BOOTC_SECUREBOOT_SIGN="false"
+BOOTC_SECUREBOOT_SCOPE=""

@@ -12,6 +12,7 @@ PROJECT=""
 WORKDIR=""
 BUILD_ID=""
 CONFIG=""
+BOOTC_SECUREBOOT_SIGN="false"
 AMD64_REMOTE=""
 ARM64_REMOTE=""
 RISCV64_REMOTE=""
@@ -35,6 +36,7 @@ BUILD_ARGS=()
 REG_USER=""
 REG_ADDR=""
 BRANCH=""
+BOOTC_SECUREBOOT_SCOPE=""
 
 help() {
 	cat << EOF
@@ -129,6 +131,29 @@ fi
 SIGN_PRIVATE_KEY="${HOME}/.config/simple-ci/secrets/${REG_USER}.private"
 SIGN_PASSWORD_FILE="${HOME}/.config/simple-ci/secrets/${REG_USER}.pw"
 
+if [[ ${SIGN} == "true" ]]; then
+	if [[ ! -f ${SIGN_PRIVATE_KEY} ]] || [[ ! -f ${SIGN_PASSWORD_FILE} ]]; then
+		echo "Missing image signature key or password file!"
+		exit 1
+	fi
+fi
+
+if  [[ ${BOOTC_SECUREBOOT_SIGN} == "true" ]] &&
+	[[ -z ${BOOTC_SECUREBOOT_SCOPE} ]]; then
+	echo "Secureboot signing requested but missing secureboot scope."
+	exit 1
+fi
+
+BOOTC_SIGN_KEY="${HOME}/.config/simple-ci/secrets/${BOOTC_SECUREBOOT_SCOPE}.db.key"
+BOOTC_SIGN_CERT="${HOME}/.config/simple-ci/secrets/${BOOTC_SECUREBOOT_SCOPE}.db.pem"
+
+if [[ ${BOOTC_SECUREBOOT_SIGN} == "true" ]]; then
+	if [[ ! -f ${BOOTC_SIGN_KEY} ]] || [[ -f ${BOOTC_SIGN_CERT} ]]; then
+		echo "Missing Secureboot Signature key or cert!"
+		exit 1
+	fi
+fi
+
 cleanup() {
 	rm -f "${LOCKFILE}"
 }
@@ -171,6 +196,13 @@ case "${PIPELINE}" in
 						RUN_HOST="${ARM64_REMOTE}"
 					elif [[ ${arch} == "riscv64" ]] && [[ -n ${RISCV64_REMOTE} ]]; then
 						RUN_HOST="${RISCV64_REMOTE}"
+					fi
+
+					if [[ ${BOOTC_SECUREBOOT_SIGN} == "true" ]]; then
+						podman_args+=(
+							"--secret id=secure_key,src=${BOOTC_SIGN_KEY}"
+							"--secret id=secure_cert,src=${BOOTC_SIGN_CERT}"
+						)
 					fi
 
 					if [[ ${EMBED_KEYS} == "true" ]] ||
@@ -267,6 +299,13 @@ case "${PIPELINE}" in
 
 					if [[ -n ${RUN_HOST} ]]; then
 						podman_args+=(-c "${RUN_HOST}")
+					fi
+
+					if [[ ${BOOTC_SECUREBOOT_SIGN} == "true" ]]; then
+						podman_args+=(
+							"--secret id=secure_key,src=${BOOTC_SIGN_KEY}"
+							"--secret id=secure_cert,src=${BOOTC_SIGN_CERT}"
+						)
 					fi
 
 					if [[ ${arch} == "riscv64" ]]; then
