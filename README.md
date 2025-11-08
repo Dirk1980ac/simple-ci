@@ -1,3 +1,7 @@
+This project moved over to radicle and the GitHub repository has been archived.
+
+Follow [this link](https://app.radicle.xyz/nodes/seed.radicle.garden/rad:z4SmCptZ81EcBS5pbvFNbppFkY1Cw) to get to the new repository.
+
 # simple-ci
 
 This is a small CI sytem for git repos.
